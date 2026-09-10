@@ -4,7 +4,7 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 ## 当前状态
 
-M0 仓库基线已建立，Docker Compose、镜像和环境配置尚未添加。
+阶段 0 `v0.1.0-foundation` 正在远端收口。阶段 2 随 Platform MVP 首次启用本地 Docker Compose，阶段 7 完成生产化、云端演示、监控、备份和恢复；当前尚无 Compose、镜像或环境组合可验证，也不提前启用部署实现。
 
 ## 职责
 
@@ -36,3 +36,7 @@ git status --short
 ```
 
 添加 Compose 配置后运行 `docker compose config`，再按 README 执行启动、健康检查、备份和恢复验证。当前尚无 Compose 文件可验证。
+
+## 许可证
+
+本仓库采用 [Apache License 2.0](LICENSE)。
