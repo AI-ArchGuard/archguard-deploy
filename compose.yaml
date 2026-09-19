@@ -1,0 +1,138 @@
+name: archguard-local
+
+services:
+  runtime-init:
+    build:
+      context: ${ARCHGUARD_SCANNER_CONTEXT:-../archguard-scanner}
+    image: archguard/scanner:0.2.1
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["mkdir -p /mailbox/requests /mailbox/responses /mailbox/cancellations && chown -R 10001:10001 /mailbox && cp /opt/archguard/scanner.jar /artifacts/scanner.jar && chmod 0444 /artifacts/scanner.jar"]
+    network_mode: none
+    read_only: true
+    volumes:
+      - runner-mailbox:/mailbox
+      - scanner-artifacts:/artifacts
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  postgres:
+    image: postgres:17.7-alpine
+    env_file: ./.local/runtime.env
+    environment:
+      POSTGRES_DB: archguard
+      POSTGRES_USER: archguard
+      POSTGRES_PASSWORD: ${ARCHGUARD_LOCAL_DB_PASSWORD:?run scripts/local-up first}
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U archguard -d archguard"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.3
+    command: [start-dev, --import-realm, --http-relative-path=/auth, --hostname=http://localhost:8080/auth]
+    env_file: ./.local/runtime.env
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${ARCHGUARD_LOCAL_KEYCLOAK_ADMIN_PASSWORD:?run scripts/local-up first}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./.local/keycloak:/opt/keycloak/data/import:ro
+    networks: [frontend, backend]
+    restart: unless-stopped
+
+  archguard-platform:
+    build:
+      context: ${ARCHGUARD_PLATFORM_CONTEXT:-../archguard-platform}
+    image: archguard/platform:0.3.0
+    env_file: ./.local/runtime.env
+    environment:
+      SPRING_PROFILES_ACTIVE: oidc,local-compose
+      ARCHGUARD_DB_URL: jdbc:postgresql://postgres:5432/archguard
+      ARCHGUARD_DB_USERNAME: archguard
+      ARCHGUARD_DB_PASSWORD: ${ARCHGUARD_LOCAL_DB_PASSWORD:?run scripts/local-up first}
+      ARCHGUARD_OIDC_ISSUER_URI: http://localhost:8080/auth/realms/archguard
+      ARCHGUARD_OIDC_JWK_SET_URI: http://keycloak:8080/auth/realms/archguard/protocol/openid-connect/certs
+      ARCHGUARD_OIDC_AUDIENCE: archguard-platform
+      ARCHGUARD_OIDC_ALLOW_HTTP: "true"
+      ARCHGUARD_SOURCE_ROOT: /sources
+      ARCHGUARD_SCANNER_JAR: /opt/archguard/scanner.jar
+      ARCHGUARD_RUNNER_MAILBOX: /mailbox
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_started}
+      runtime-init: {condition: service_completed_successfully}
+    read_only: true
+    tmpfs: [/tmp:rw,noexec,nosuid,size=64m]
+    volumes:
+      - scanner-artifacts:/opt/archguard:ro
+      - runner-mailbox:/mailbox
+      - ${ARCHGUARD_SOURCES_CONTEXT:-../archguard-samples}:/sources:ro
+    networks: [backend]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8080/actuator/health/readiness]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  scanner-runner:
+    image: archguard/scanner:0.2.1
+    entrypoint: ["/sbin/tini", "--", "/bin/sh", "/runner/runner.sh"]
+    depends_on:
+      runtime-init: {condition: service_completed_successfully}
+    network_mode: none
+    read_only: true
+    tmpfs: [/work:rw,noexec,nosuid,size=256m,mode=1777]
+    volumes:
+      - ./runner/runner.sh:/runner/runner.sh:ro
+      - runner-mailbox:/mailbox
+      - ${ARCHGUARD_SOURCES_CONTEXT:-../archguard-samples}:/sources:ro
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 768m
+    restart: unless-stopped
+
+  archguard-web:
+    build:
+      context: ${ARCHGUARD_WEB_CONTEXT:-../archguard-web}
+      args:
+        VITE_OIDC_AUTHORITY: http://localhost:8080/auth/realms/archguard
+        VITE_OIDC_CLIENT_ID: archguard-web
+        VITE_OIDC_REDIRECT_URI: http://localhost:8080/auth/callback
+        VITE_OIDC_POST_LOGOUT_REDIRECT_URI: http://localhost:8080/
+    image: archguard/web:0.1.0
+    depends_on:
+      archguard-platform: {condition: service_healthy}
+      keycloak: {condition: service_started}
+    ports: ["127.0.0.1:8080:8080"]
+    read_only: true
+    tmpfs: [/tmp:rw,noexec,nosuid,size=16m, /var/cache/nginx:rw,noexec,nosuid,size=16m, /var/run:rw,noexec,nosuid,size=4m]
+    networks: [frontend, backend]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+networks:
+  frontend:
+    internal: false
+  backend:
+    internal: true
+
+volumes:
+  postgres-data:
+  runner-mailbox:
+  scanner-artifacts:
