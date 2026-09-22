@@ -18,7 +18,7 @@ services:
     cap_add: [CHOWN]
 
   postgres:
-    image: postgres:17.7-alpine
+    image: postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2
     env_file: ./.local/runtime.env
     environment:
       POSTGRES_DB: archguard
@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.5.3
+    image: quay.io/keycloak/keycloak:26.5.3@sha256:5a236ae4dd8ece77490115bace15a11a4d15e9cbcf58a490b95a7da2cd71d32a
     command: [start-dev, --import-realm, --http-relative-path=/auth, --hostname=http://localhost:8080/auth]
     env_file: ./.local/runtime.env
     environment:

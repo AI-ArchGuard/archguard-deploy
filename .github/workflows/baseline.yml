@@ -45,6 +45,8 @@ jobs:
             > .local/runtime.env
           docker compose --env-file .local/runtime.env config --quiet
           docker compose --env-file .local/runtime.env config --format json > .local/compose.json
+          jq -e '.services.postgres.image == "postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2"' .local/compose.json
+          jq -e '.services.keycloak.image == "quay.io/keycloak/keycloak:26.5.3@sha256:5a236ae4dd8ece77490115bace15a11a4d15e9cbcf58a490b95a7da2cd71d32a"' .local/compose.json
           jq -e '.services["archguard-platform"].tmpfs == ["/tmp:rw,noexec,nosuid,size=64m"]' .local/compose.json
           jq -e '.services["scanner-runner"].tmpfs == ["/work:rw,noexec,nosuid,size=256m,mode=1777"]' .local/compose.json
           jq -e '.services["archguard-web"].tmpfs == ["/tmp:rw,noexec,nosuid,size=16m", "/var/cache/nginx:rw,noexec,nosuid,size=16m", "/var/run:rw,noexec,nosuid,size=4m"]' .local/compose.json
