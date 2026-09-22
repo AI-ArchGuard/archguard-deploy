@@ -4,7 +4,7 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 ## 当前状态
 
-阶段 0 `v0.1.0-foundation` 正在远端收口。阶段 2 随 Platform MVP 首次启用本地 Docker Compose，阶段 7 完成生产化、云端演示、监控、备份和恢复；当前尚无 Compose、镜像或环境组合可验证，也不提前启用部署实现。
+阶段 2 Platform MVP 已提供本地 Docker Compose。Web 是唯一公开入口；Platform、PostgreSQL、Keycloak 内部端口与 Scanner Runner 均不暴露到主机。兼容版本见 [兼容矩阵](compatibility/platform-mvp.md)。
 
 ## 职责
 
@@ -28,14 +28,31 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 ## 本地验证
 
-当前基线可执行：
+在八仓库同级检出后，Windows 使用一条命令生成本地短期凭据并启动：
+
+```powershell
+.\scripts\local-up.ps1
+```
+
+脚本只把随机凭据写入被忽略的 `.local/`，并在本次终端显示演示用户 `maintainer` 的随机密码。打开 `http://localhost:8080` 完成 OIDC 登录。源码输入固定只读挂载自 `../archguard-samples`，Repository API 只接受其下相对路径。
+
+配置验证：
 
 ```bash
+docker compose --env-file .local/runtime.env config
 git diff --check
 git status --short
 ```
 
-添加 Compose 配置后运行 `docker compose config`，再按 README 执行启动、健康检查、备份和恢复验证。当前尚无 Compose 文件可验证。
+Runner 使用版本化文件邮箱，不接收数据库/OIDC 凭据，运行时无网络、非 root、只读根文件系统、删除全部 capabilities，并设置内存、PID、超时和进程树终止边界。任务工作目录在完成、失败或取消后立即删除；无法删除的目录留在临时文件系统，容器重启时清除。
+
+停止环境：
+
+```powershell
+docker compose --env-file .local/runtime.env down
+```
+
+需要清空本地 PostgreSQL、邮箱和制品卷时，显式追加 `--volumes`；该操作会删除本地数据，不属于普通停止流程。
 
 ## 许可证
 

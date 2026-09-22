@@ -8,3 +8,5 @@
 
 - 初始化仓库治理、协作和质量基线。
 - 采用 Apache License 2.0，并在 CI 中固定标准许可证校验和。
+- 增加 Platform MVP Compose：Web、Platform、PostgreSQL、本地 Keycloak 和无网络 Scanner Runner。
+- 增加随机本地凭据引导、Keycloak realm 模板、Runner 文件邮箱协议和兼容矩阵。

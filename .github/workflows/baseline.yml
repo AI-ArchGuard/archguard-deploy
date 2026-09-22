@@ -28,3 +28,30 @@ jobs:
         run: |
           baseline_empty_tree="$(git hash-object -t tree /dev/null)"
           git diff --check "$baseline_empty_tree" HEAD
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify Compose model and tmpfs boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .local/keycloak
+          printf '%s\n' \
+            'ARCHGUARD_LOCAL_DB_PASSWORD=compose-validation-only' \
+            'ARCHGUARD_LOCAL_KEYCLOAK_ADMIN_PASSWORD=compose-validation-only' \
+            > .local/runtime.env
+          docker compose --env-file .local/runtime.env config --quiet
+          docker compose --env-file .local/runtime.env config --format json > .local/compose.json
+          jq -e '.services["archguard-platform"].tmpfs == ["/tmp:rw,noexec,nosuid,size=64m"]' .local/compose.json
+          jq -e '.services["scanner-runner"].tmpfs == ["/work:rw,noexec,nosuid,size=256m,mode=1777"]' .local/compose.json
+          jq -e '.services["archguard-web"].tmpfs == ["/tmp:rw,noexec,nosuid,size=16m", "/var/cache/nginx:rw,noexec,nosuid,size=16m", "/var/run:rw,noexec,nosuid,size=4m"]' .local/compose.json
+          jq -e '.services["runtime-init"].cap_add == ["CHOWN"] and .services["runtime-init"].cap_drop == ["ALL"]' .local/compose.json
+          jq -e '.services["runtime-init"].command[0] | contains("rm -f /artifacts/scanner.jar")' .local/compose.json
+          jq -e '.services["scanner-runner"].cap_add == null and .services["scanner-runner"].cap_drop == ["ALL"]' .local/compose.json
+          jq -e '.users[] | select(.username == "maintainer") | .email == "maintainer@localhost.invalid" and .firstName == "Local" and .lastName == "Maintainer" and .requiredActions == []' keycloak/realm.template.json
+          jq -e '.clients[] | select(.clientId == "archguard-platform") | .bearerOnly == true' keycloak/realm.template.json
+          jq -e '.clients[] | select(.clientId == "archguard-web") | .protocolMappers[] | select(.protocolMapper == "oidc-audience-mapper") | .config["included.client.audience"] == "archguard-platform" and .config["access.token.claim"] == "true"' keycloak/realm.template.json
+          jq -e '.clients[] | select(.clientId == "archguard-web") | .protocolMappers[] | select(.protocolMapper == "oidc-sub-mapper") | .config["access.token.claim"] == "true"' keycloak/realm.template.json
