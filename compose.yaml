@@ -64,6 +64,7 @@ services:
       ARCHGUARD_SOURCE_ROOT: /sources
       ARCHGUARD_SCANNER_JAR: /opt/archguard/scanner.jar
       ARCHGUARD_RUNNER_MAILBOX: /mailbox
+      ARCHGUARD_GITHUB_WEBHOOK_SECRET: ${ARCHGUARD_GITHUB_WEBHOOK_SECRET:?run scripts/local-up first}
     depends_on:
       postgres: {condition: service_healthy}
       keycloak: {condition: service_started}

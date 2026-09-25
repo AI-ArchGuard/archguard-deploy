@@ -11,9 +11,11 @@ function New-Secret([int]$bytes = 24) {
 $db = New-Secret
 $admin = New-Secret
 $demo = New-Secret 12
+$webhook = New-Secret 32
 @"
 ARCHGUARD_LOCAL_DB_PASSWORD=$db
 ARCHGUARD_LOCAL_KEYCLOAK_ADMIN_PASSWORD=$admin
+ARCHGUARD_GITHUB_WEBHOOK_SECRET=$webhook
 "@ | Set-Content -LiteralPath (Join-Path $local 'runtime.env') -Encoding utf8NoBOM
 $template = Get-Content -LiteralPath (Join-Path $root 'keycloak/realm.template.json') -Raw
 $template.Replace('__DEMO_USER_PASSWORD__', $demo) | Set-Content -LiteralPath (Join-Path $keycloak 'realm.json') -Encoding utf8NoBOM

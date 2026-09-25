@@ -1,0 +1,48 @@
+# Copy into a trusted GitHub repository after Platform 3E is deployed and linked.
+# Secrets are intentionally unavailable for fork pull requests; those runs fail closed.
+name: ArchGuard governance
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  statuses: write
+concurrency:
+  group: archguard-governance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      # Pin the Deploy script checkout to a reviewed immutable commit at adoption time.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: AI-ArchGuard/archguard-deploy
+          ref: REPLACE_WITH_REVIEWED_DEPLOY_COMMIT
+          path: .archguard-deploy
+          persist-credentials: false
+      - name: Download and verify pinned Scanner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .archguard
+          curl --fail --location --retry 3 --output .archguard/scanner.jar \
+            https://github.com/AI-ArchGuard/archguard-scanner/releases/download/v0.2.1/archguard-scanner.jar
+          echo 'c2119c2e5ded8d5f1de18f64e0f3959864033b44af22e0ca6611c9761db1ed1f  .archguard/scanner.jar' | sha256sum --check --strict
+      - name: Scan and evaluate
+        shell: bash
+        env:
+          ARCHGUARD_PLATFORM_URL: ${{ vars.ARCHGUARD_PLATFORM_URL }}
+          ARCHGUARD_PROJECT_ID: ${{ vars.ARCHGUARD_PROJECT_ID }}
+          ARCHGUARD_REPOSITORY_ID: ${{ vars.ARCHGUARD_REPOSITORY_ID }}
+          ARCHGUARD_RULESET_VERSION_ID: ${{ vars.ARCHGUARD_RULESET_VERSION_ID }}
+          ARCHGUARD_RULES_FILE: .archguard/rules.yaml
+          ARCHGUARD_SCANNER_JAR: .archguard/scanner.jar
+          ARCHGUARD_CI_TOKEN: ${{ secrets.ARCHGUARD_CI_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .archguard-deploy/ci/governance_gate.py
