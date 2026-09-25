@@ -1,6 +1,6 @@
 # 3E：GitHub CI 与 Webhook 接入
 
-这是部署模板，不自动启用任何仓库的门禁。先部署含 Flyway V5 的 Platform 3E，待 `main` CI 通过后，再配置本模板。Scanner 保持 `v0.2.1`，Result Schema 保持 `0.1.0`。
+这是部署模板，不自动启用任何仓库的门禁。先部署含 Flyway V5 的 Platform 3E（合并提交 `637aea701561cdecfee7c99e58002d618bad7148`），待 `main` CI 通过后，再配置本模板。Scanner 保持 `v0.2.1`，Result Schema 保持 `0.1.0`。Deploy 3E 提交发布前应以其合并 SHA 替换示例中的占位符，不能使用浮动分支。
 
 1. 以 Project Maintainer 身份调用 Platform `PUT /api/v1/projects/{projectId}/repositories/{repositoryId}/github/link`，请求 `providerRepositoryId` 为 GitHub 数字 Repository ID。绑定不可改；填错时需显式数据修复流程，不能覆盖旧值。
 2. 给 Platform 注入独立随机 `ARCHGUARD_GITHUB_WEBHOOK_SECRET`。GitHub Repository Webhook 的 Payload URL 指向已配置的 HTTPS 入口 `/api/v1/github/webhooks`，Content type 为 `application/json`，Secret 为相同值，事件只选 Pull requests。不要把 Platform、数据库或 Keycloak 内部端口直接暴露公网。本地 Compose 只绑定 `127.0.0.1:8080`，不能直接接收 GitHub 云端投递。

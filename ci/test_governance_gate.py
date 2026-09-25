@@ -72,6 +72,14 @@ class GovernanceGateTest(unittest.TestCase):
                     self.assertEqual(exit_code, gate.run())
                     self.assertEqual(state, api.call_args.args[3]["state"])
 
+    def test_late_result_cannot_publish_newer_pr_head(self):
+        with mock.patch.object(gate, "request_json", return_value={"headSha": "b" * 40,
+                                                            "currentGateEvaluationId": "new-gate"}) as api:
+            with self.assertRaises(gate.GateFailure) as failure:
+                gate.await_current_head("https://example.invalid/pr", "token", "a" * 40, "old-gate")
+            self.assertEqual(70, failure.exception.exit_code)
+            self.assertEqual(1, api.call_count)
+
 
 if __name__ == "__main__":
     unittest.main()
