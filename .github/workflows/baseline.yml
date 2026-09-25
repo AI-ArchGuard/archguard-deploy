@@ -28,6 +28,8 @@ jobs:
         run: |
           baseline_empty_tree="$(git hash-object -t tree /dev/null)"
           git diff --check "$baseline_empty_tree" HEAD
+      - name: Test GitHub CI gate adapter
+        run: python3 -m unittest discover -s ci -p 'test_*.py'
 
   compose:
     runs-on: ubuntu-latest
@@ -42,6 +44,7 @@ jobs:
           printf '%s\n' \
             'ARCHGUARD_LOCAL_DB_PASSWORD=compose-validation-only' \
             'ARCHGUARD_LOCAL_KEYCLOAK_ADMIN_PASSWORD=compose-validation-only' \
+            'ARCHGUARD_GITHUB_WEBHOOK_SECRET=compose-validation-only' \
             > .local/runtime.env
           docker compose --env-file .local/runtime.env config --quiet
           docker compose --env-file .local/runtime.env config --format json > .local/compose.json

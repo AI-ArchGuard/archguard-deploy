@@ -20,3 +20,5 @@ tmp/
 .DS_Store
 Thumbs.db
 .local/
+__pycache__/
+*.pyc

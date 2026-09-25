@@ -6,6 +6,8 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 阶段 2 Platform MVP 已提供本地 Docker Compose。Web 是唯一公开入口；Platform、PostgreSQL、Keycloak 内部端口与 Scanner Runner 均不暴露到主机。兼容版本见 [兼容矩阵](compatibility/platform-mvp.md)。
 
+阶段 3E 增加 [GitHub CI 与 Webhook 接入模板](docs/governance-3e-ci.md)。模板不会自动启用；需先部署 Platform 3E 并配置 HTTPS 入口和有权限的 CI 身份。Scanner 与 Result Schema 不变。
+
 ## 职责
 
 - 提供本地 Docker Compose、CI/Staging/Production 部署方案和健康检查。
