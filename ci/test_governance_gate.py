@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -6,11 +7,64 @@ import subprocess
 import tempfile
 import unittest
 from unittest import mock
+import urllib.error
 
 import governance_gate as gate
 
 
 class GovernanceGateTest(unittest.TestCase):
+    def test_submission_retries_transient_failure_with_same_idempotency_key_and_body(self):
+        requests = []
+
+        def respond(request, timeout):
+            requests.append(request)
+            if len(requests) == 1:
+                raise urllib.error.HTTPError(request.full_url, 503, "Unavailable", {}, None)
+            return io.BytesIO(b'{"id":"submission-1"}')
+
+        with mock.patch.object(gate.urllib.request, "urlopen", side_effect=respond), \
+                mock.patch.object(gate.time, "sleep") as sleep:
+            result = gate.submit("https://example.invalid/report-submissions", "secret", "stable-key",
+                                 {"reportSha256": "abc"}, b'{}')
+        self.assertEqual("submission-1", result["id"])
+        self.assertEqual(2, len(requests))
+        self.assertEqual(requests[0].data, requests[1].data)
+        self.assertEqual("stable-key", requests[0].get_header("Idempotency-key"))
+        self.assertEqual("stable-key", requests[1].get_header("Idempotency-key"))
+        sleep.assert_called_once()
+
+    def test_submission_does_not_retry_authorization_failure(self):
+        with mock.patch.object(gate.urllib.request, "urlopen", side_effect=urllib.error.HTTPError(
+                "https://example.invalid", 401, "Unauthorized", {}, None)) as api, \
+                mock.patch.object(gate.time, "sleep") as sleep:
+            with self.assertRaises(gate.GateFailure) as failure:
+                gate.submit("https://example.invalid", "secret", "stable-key", {}, b'{}')
+        self.assertEqual(70, failure.exception.exit_code)
+        self.assertEqual(1, api.call_count)
+        sleep.assert_not_called()
+
+    def test_status_publication_retries_transient_failure_only(self):
+        with mock.patch.object(gate.urllib.request, "urlopen", side_effect=[
+                urllib.error.HTTPError("https://example.invalid", 429, "Rate limited", {}, None),
+                io.BytesIO(b'{"state":"success"}')]) as api, \
+                mock.patch.object(gate.time, "sleep") as sleep:
+            gate.publish_status("https://example.invalid", "secret", {"state": "success"})
+        self.assertEqual(2, api.call_count)
+        sleep.assert_called_once()
+
+    def test_exhausted_status_retry_returns_seventy_without_exposing_token(self):
+        def unavailable(request, timeout):
+            raise urllib.error.HTTPError(request.full_url, 503, "Unavailable", {}, None)
+
+        with mock.patch.object(gate.urllib.request, "urlopen", side_effect=unavailable) as api, \
+                mock.patch.object(gate.time, "sleep") as sleep:
+            with self.assertRaises(gate.GateFailure) as failure:
+                gate.publish_status("https://example.invalid", "private-token", {"state": "failure"})
+        self.assertEqual(70, failure.exception.exit_code)
+        self.assertNotIn("private-token", str(failure.exception))
+        self.assertEqual(3, api.call_count)
+        self.assertEqual(2, sleep.call_count)
+
     def test_pull_request_uses_head_not_merge_commit(self):
         head, base = "a" * 40, "b" * 40
         event = {"pull_request": {"number": 17, "head": {"sha": head},
@@ -24,6 +78,13 @@ class GovernanceGateTest(unittest.TestCase):
         revision, reference = gate.revision_from_event("push", {}, "123", "a" * 40, "main")
         self.assertEqual("a" * 40, revision["commitSha"])
         self.assertIsNone(reference)
+
+    def test_push_rejects_checkout_that_is_not_claimed_commit(self):
+        with mock.patch.object(gate.subprocess, "run", return_value=subprocess.CompletedProcess(
+                ["git"], 0, stdout="b" * 40 + "\n")):
+            with self.assertRaises(gate.GateFailure) as failure:
+                gate.require_checkout_revision(Path("/workspace"), "a" * 40)
+        self.assertEqual(64, failure.exception.exit_code)
 
     def test_invalid_commit_fails_configuration(self):
         with self.assertRaises(gate.GateFailure) as failure:
@@ -56,21 +117,23 @@ class GovernanceGateTest(unittest.TestCase):
                    "GITHUB_REPOSITORY_ID": "123", "GITHUB_REPOSITORY": "example/repo",
                    "GITHUB_SHA": "a" * 40, "GITHUB_REF_NAME": "main", "RUNNER_TEMP": str(root)}
 
-            def scan(*args, **kwargs):
+            def scan(args, **kwargs):
+                if args[0] == "git":
+                    return subprocess.CompletedProcess(args, 0, stdout="a" * 40 + "\n")
                 (root / "archguard-governance-report.json").write_bytes(b'{}')
                 return subprocess.CompletedProcess(args, 2)
 
             with mock.patch.dict(os.environ, env), mock.patch.object(gate.subprocess, "run", side_effect=scan), \
                     mock.patch.object(gate, "submit", return_value={"id": "submission-1"}), \
                     mock.patch.object(gate, "await_gate") as gate_result, \
-                    mock.patch.object(gate, "request_json") as api:
+                    mock.patch.object(gate, "publish_status") as api:
                 for outcome, exit_code, state in (("FAIL", 2, "failure"), ("PASS", 0, "success")):
                     gate_result.return_value = {"submissionId": "submission-1",
                                                 "revision": {"commitSha": "a" * 40},
                                                 "ciExitCode": exit_code, "outcome": outcome}
                     api.reset_mock()
                     self.assertEqual(exit_code, gate.run())
-                    self.assertEqual(state, api.call_args.args[3]["state"])
+                    self.assertEqual(state, api.call_args.args[2]["state"])
 
     def test_late_result_cannot_publish_newer_pr_head(self):
         with mock.patch.object(gate, "request_json", return_value={"headSha": "b" * 40,

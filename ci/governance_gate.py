@@ -40,6 +40,32 @@ def request_json(url, method, token, value=None, extra_headers=None):
         raise GateFailure(f"API request failed: {type(error).__name__}", 70) from error
 
 
+def retry_post_json(request, timeout, operation):
+    """Retry only temporary transport failures; callers must tolerate repeated POSTs."""
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as error:
+            if error.code not in (408, 429, 500, 502, 503, 504) or attempt == 2:
+                raise GateFailure(f"{operation} failed: HTTP {error.code}", 70) from error
+            error.close()
+        except (urllib.error.URLError, TimeoutError) as error:
+            if attempt == 2:
+                raise GateFailure(f"{operation} failed: {type(error).__name__}", 70) from error
+        except ValueError as error:
+            raise GateFailure(f"{operation} failed: invalid JSON response", 70) from error
+        time.sleep(2 ** attempt)
+
+
+def publish_status(url, token, value):
+    data = json.dumps(value, separators=(",", ":")).encode()
+    request = urllib.request.Request(url, data, {
+        "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json"}, "POST")
+    return retry_post_json(request, 30, "GitHub status publication")
+
+
 def multipart(metadata, report):
     boundary = f"archguard-{uuid.uuid4().hex}"
     body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"metadata\"\r\n"
@@ -53,13 +79,10 @@ def multipart(metadata, report):
 
 def submit(url, token, key, metadata, report):
     content_type, body = multipart(metadata, report)
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, body, {
-            "Authorization": f"Bearer {token}", "Idempotency-Key": key,
-            "Content-Type": content_type, "Accept": "application/json"}, "POST"), timeout=60) as response:
-            return json.load(response)
-    except (urllib.error.URLError, ValueError) as error:
-        raise GateFailure(f"Report submission failed: {type(error).__name__}", 70) from error
+    request = urllib.request.Request(url, body, {
+        "Authorization": f"Bearer {token}", "Idempotency-Key": key,
+        "Content-Type": content_type, "Accept": "application/json"}, "POST")
+    return retry_post_json(request, 60, "Report submission")
 
 
 def await_gate(url, token, submission_id):
@@ -107,6 +130,13 @@ def revision_from_event(event_name, event, repository_id, sha, ref_name):
     return revision, reference
 
 
+def require_checkout_revision(workspace, sha):
+    actual = subprocess.run(["git", "-C", str(workspace), "rev-parse", "HEAD"],
+                            capture_output=True, text=True, check=True).stdout.strip()
+    if actual != sha:
+        raise GateFailure("Checkout is not the claimed Git commit", 64)
+
+
 def run():
     platform = required("ARCHGUARD_PLATFORM_URL").rstrip("/")
     if not platform.startswith("https://") and not platform.startswith("http://127.0.0.1:"):
@@ -122,9 +152,7 @@ def run():
                                        required("GITHUB_SHA"), required("GITHUB_REF_NAME"))
     if not scanner.is_file() or not rules.is_file() or not workspace.is_dir():
         raise GateFailure("Scanner, rules, or checkout is missing", 64)
-    if pr and subprocess.run(["git", "-C", str(workspace), "rev-parse", "HEAD"],
-                             capture_output=True, text=True, check=True).stdout.strip() != revision["commitSha"]:
-        raise GateFailure("Checkout is not the PR head commit", 64)
+    require_checkout_revision(workspace, revision["commitSha"])
     report_file = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "archguard-governance-report.json"
     report_file.unlink(missing_ok=True)
     scan = subprocess.run(["java", "-jar", str(scanner), "scan", str(workspace),
@@ -158,9 +186,8 @@ def run():
     state = {0: "success", 2: "failure", 64: "error", 70: "error"}[exit_code]
     description = f"ArchGuard governance: {gate['outcome']}"
     github_url = f"https://api.github.com/repos/{github_repository}/statuses/{revision['commitSha']}"
-    request_json(github_url, "POST", github_token,
-                 {"state": state, "context": "archguard/governance", "description": description},
-                 {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
+    publish_status(github_url, github_token,
+                   {"state": state, "context": "archguard/governance", "description": description})
     print(f"Governance gate: {gate['outcome']} (exit {exit_code})")
     return exit_code
 

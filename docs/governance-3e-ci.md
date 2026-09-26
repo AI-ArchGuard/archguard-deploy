@@ -9,4 +9,6 @@
 
 CI 固定 Scanner JAR SHA-256，在自己的 checkout 执行扫描。Scanner `2` 仍提交报告，Platform 的最终门禁才决定退出 `0/2/64/70`。PR 使用真实 head SHA 而非 GitHub 合成 merge SHA；签名 Webhook 必须先到达并指向该 head，CI 才发布状态。迟到扫描不覆盖新 head；事件缺失或服务不可达时退出 `70`，不会伪报通过。Webhook 重放、乱序和签名错误由 Platform 安全处理。
 
+阶段 3G 增加 PR 和 push 的实际 checkout SHA 核对。报告提交复用确定的幂等键，在临时网络错误、HTTP `408`/`429`/指定 `5xx` 时最多尝试三次；身份或契约类 `4xx` 立即失败。GitHub 状态发布也有限重试，但 GitHub Status API 没有本模板可用的幂等键：如果响应丢失，可能出现重复的同值状态记录；Platform 的提交和门禁业务事实不会重复。最终发布仍失败时退出 `70`，需要重新运行 CI；重跑时相同报告仍使用同一幂等键。日志不输出凭据或报告内容。
+
 回滚：先禁用目标仓库工作流和 Webhook，再回退 Platform 应用；Flyway V5 与审计事实保留，不执行 down migration。只有受信任的 HTTPS 入口、可用 OIDC token、GitHub Webhook 和基线全部就绪，模板才是可运行的门禁；本地 Compose 模拟不等于公网投递验收。
