@@ -1,4 +1,5 @@
 #!/bin/sh
+# Keep this bind-mounted script LF on Windows (see .gitattributes).
 set -eu
 
 mkdir -p /mailbox/requests /mailbox/responses /mailbox/cancellations

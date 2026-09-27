@@ -50,7 +50,7 @@ services:
   archguard-platform:
     build:
       context: ${ARCHGUARD_PLATFORM_CONTEXT:-../archguard-platform}
-    image: archguard/platform:0.3.0
+    image: archguard/platform:0.4.0
     env_file: ./.local/runtime.env
     environment:
       SPRING_PROFILES_ACTIVE: oidc,local-compose
@@ -62,7 +62,7 @@ services:
       ARCHGUARD_OIDC_AUDIENCE: archguard-platform
       ARCHGUARD_OIDC_ALLOW_HTTP: "true"
       ARCHGUARD_SOURCE_ROOT: /sources
-      ARCHGUARD_SCANNER_JAR: /opt/archguard/scanner.jar
+      ARCHGUARD_SCANNER_JAR: /opt/archguard/scanner-artifacts/scanner.jar
       ARCHGUARD_RUNNER_MAILBOX: /mailbox
       ARCHGUARD_GITHUB_WEBHOOK_SECRET: ${ARCHGUARD_GITHUB_WEBHOOK_SECRET:?run scripts/local-up first}
     depends_on:
@@ -73,7 +73,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m
     volumes:
-      - scanner-artifacts:/opt/archguard:ro
+      - scanner-artifacts:/opt/archguard/scanner-artifacts:ro
       - runner-mailbox:/mailbox
       - ${ARCHGUARD_SOURCES_CONTEXT:-../archguard-samples}:/sources:ro
     networks: [backend]
@@ -113,7 +113,7 @@ services:
         VITE_OIDC_CLIENT_ID: archguard-web
         VITE_OIDC_REDIRECT_URI: http://localhost:8080/auth/callback
         VITE_OIDC_POST_LOGOUT_REDIRECT_URI: http://localhost:8080/
-    image: archguard/web:0.1.0
+    image: archguard/web:0.2.0
     depends_on:
       archguard-platform: {condition: service_healthy}
       keycloak: {condition: service_started}
