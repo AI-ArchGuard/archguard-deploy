@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-27
+
+### Added
+
+- 阶段 3 GitHub CI 与 Webhook 模板、固定 Samples 的 Compose 治理验收。
+- 重复启动复用本地凭据，Windows Runner 脚本保持 LF，新增本地启动回归测试。
+- Scanner 制品卷改为专用子目录，避免遮蔽 Platform 应用 JAR；Compose 使用 Platform `0.4.0` 和 Web `0.2.0` 本地镜像标签。
+
 ## [0.3.0] - 2026-09-22
 
 ### Added

@@ -4,9 +4,11 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 ## 当前状态
 
-阶段 2 Platform MVP 已提供本地 Docker Compose。Web 是唯一公开入口；Platform、PostgreSQL、Keycloak 内部端口与 Scanner Runner 均不暴露到主机。兼容版本见 [兼容矩阵](compatibility/platform-mvp.md)。
+阶段 2 Platform MVP 已提供本地 Docker Compose。Web 是唯一公开入口；Platform、PostgreSQL、Keycloak 内部端口与 Scanner Runner 均不暴露到主机。历史版本见[阶段 2 矩阵](compatibility/platform-mvp.md)，当前持续治理组合见[阶段 3 矩阵](compatibility/governance-v0.4.md)。
 
 阶段 3E 增加 [GitHub CI 与 Webhook 接入模板](docs/governance-3e-ci.md)。模板不会自动启用；需先部署 Platform 3E 并配置 HTTPS 入口和有权限的 CI 身份。Scanner 与 Result Schema 不变。
+
+阶段 3H 的[本地 Compose 治理验收步骤](docs/governance-3h-compose-acceptance.md)已通过合成闭环：新增违规 `FAIL/2`、修复后门禁 `PASS/0`，独立 PR 修订差异 `RESOLVED=1`。发布前仍需固定版本制品、兼容矩阵及合并后 CI 证据。
 
 ## 职责
 
@@ -38,6 +40,8 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 脚本只把随机凭据写入被忽略的 `.local/`，并在本次终端显示演示用户 `maintainer` 的随机密码。打开 `http://localhost:8080` 完成 OIDC 登录。源码输入固定只读挂载自 `../archguard-samples`，Repository API 只接受其下相对路径。
 
+同一检出的后续启动复用 `.local/runtime.env` 和 Keycloak realm，不轮换已有数据卷的密码；若只缺少其中一个文件会拒绝启动，须先恢复配套凭据。不得把 `.local/` 提交或分享。Windows 检出时 `runner/runner.sh` 强制为 LF，避免绑定挂载脚本在容器内无法执行。
+
 配置验证：
 
 ```bash
@@ -47,6 +51,8 @@ git status --short
 ```
 
 Runner 使用版本化文件邮箱，不接收数据库/OIDC 凭据，运行时无网络、非 root、只读根文件系统、删除全部 capabilities，并设置内存、PID、超时和进程树终止边界。任务工作目录在完成、失败或取消后立即删除；无法删除的目录留在临时文件系统，容器重启时清除。
+
+Scanner 制品卷仅挂载在 Platform 的 `/opt/archguard/scanner-artifacts`，避免遮蔽镜像自带的 `platform.jar`；升级后可核对 Flyway 迁移版本和容器内应用 JAR，而不必清空数据卷。
 
 停止环境：
 
