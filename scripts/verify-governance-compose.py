@@ -74,17 +74,27 @@ def local_credentials() -> tuple[dict[str, str], dict]:
     return runtime, realm
 
 
-def temporary_client(base_url: str, runtime: dict[str, str], realm: dict) -> tuple[str, str, str]:
+def admin_token(base_url: str, runtime: dict[str, str]) -> str:
     _, admin, _ = request(
         f"{base_url}/auth/realms/master/protocol/openid-connect/token", "POST",
         payload={"client_id": "admin-cli", "username": "admin",
                  "password": runtime["ARCHGUARD_LOCAL_KEYCLOAK_ADMIN_PASSWORD"],
                  "grant_type": "password"}, content_type="application/x-www-form-urlencoded")
-    admin_token = admin["access_token"]
+    return admin["access_token"]
+
+
+def cleanup_client(base_url: str, runtime: dict[str, str], client_uuid: str) -> None:
+    # Master realm tokens can expire during a complete Compose journey.
+    request(f"{base_url}/auth/admin/realms/archguard/clients/{client_uuid}",
+            "DELETE", token=admin_token(base_url, runtime), expected=(204,))
+
+
+def temporary_client(base_url: str, runtime: dict[str, str], realm: dict) -> tuple[str, str, str]:
+    admin_access = admin_token(base_url, runtime)
     template = next(client for client in realm["clients"] if client["clientId"] == "archguard-web")
     client_id = "archguard-acceptance-" + uuid.uuid4().hex[:12]
     _, _, response_headers = request(
-        f"{base_url}/auth/admin/realms/archguard/clients", "POST", token=admin_token,
+        f"{base_url}/auth/admin/realms/archguard/clients", "POST", token=admin_access,
         payload={"clientId": client_id, "name": "Temporary local governance acceptance",
                  "enabled": True, "publicClient": True, "directAccessGrantsEnabled": True,
                  "standardFlowEnabled": False,
@@ -99,10 +109,9 @@ def temporary_client(base_url: str, runtime: dict[str, str], realm: dict) -> tup
                      "password": password, "grant_type": "password"},
             content_type="application/x-www-form-urlencoded")
     except BaseException:
-        request(f"{base_url}/auth/admin/realms/archguard/clients/{client_uuid}",
-                "DELETE", token=admin_token, expected=(204,))
+        cleanup_client(base_url, runtime, client_uuid)
         raise
-    return admin_token, client_uuid, user["access_token"]
+    return admin_access, client_uuid, user["access_token"]
 
 
 def multipart(metadata: dict, report: bytes) -> tuple[str, bytes]:
@@ -162,7 +171,7 @@ def webhook(base_url: str, secret: str, provider_id: str, head: str, at: datetim
     return value
 
 
-def run(base_url: str, scanner: Path, samples: Path) -> None:
+def run(base_url: str, scanner: Path, samples: Path, on_complete=None) -> None:
     require(scanner.is_file(), "Pinned Scanner JAR is missing")
     fixture = samples / "governance/java-ci-journey"
     require((fixture / "baseline/archguard-rules.yaml").is_file(), "Fixed synthetic journey is missing")
@@ -233,6 +242,7 @@ def run(base_url: str, scanner: Path, samples: Path) -> None:
         _, failed_evaluation, _ = request(base + f"/gate-evaluations/{failed_gate['id']}", token=token)
         _, comparison, _ = request(base + f"/comparisons/{failed_evaluation['comparisonId']}", token=token)
         require(comparison["findings"][0]["classification"] == "NEW", "Finding is not NEW")
+        _, introduced_pr, _ = request(base + "/github/pull-requests/7", token=token)
         replay_status, replay = submit(base, token, version_id, provider_id,
                                        "b" * 40, violation, "introduced-" + suffix, "7")
         require(replay_status == 200 and replay["id"] == failed_submission["id"],
@@ -297,9 +307,17 @@ def run(base_url: str, scanner: Path, samples: Path) -> None:
                 and revision_delta["resolvedCount"] == 1
                 and revision_delta["findings"][0]["classification"] == "RESOLVED",
                 "PR revision delta did not classify the repair as RESOLVED")
+        if on_complete:
+            on_complete({"base_url": base_url, "token": token, "project_url": project_url,
+                         "project_id": project_id, "repository_url": base,
+                         "repository_id": repository_id, "scan_job_id": failed_evaluation["candidateJobId"],
+                         "report_sha256": hashlib.sha256(violation).hexdigest(),
+                         "rule_set_version_id": version_id, "provider_id": provider_id,
+                         "synthetic_report": violation,
+                         "pr_revision_id": introduced_pr["currentHeadRevisionId"],
+                         "gates": [failed_gate, excepted_gate, expired_gate, repaired_gate]})
     finally:
-        request(f"{base_url}/auth/admin/realms/archguard/clients/{client_uuid}",
-                "DELETE", token=admin_token, expected=(204,))
+        cleanup_client(base_url, runtime, client_uuid)
 
 
 if __name__ == "__main__":
