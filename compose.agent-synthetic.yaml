@@ -1,0 +1,24 @@
+# Explicit local acceptance only. Never enable an external provider here.
+services:
+  runtime-init:
+    build:
+      context: ${ARCHGUARD_SCANNER_CONTEXT:?provide pinned Scanner context}
+  archguard-platform:
+    build:
+      context: ${ARCHGUARD_PLATFORM_CONTEXT:?provide pinned Platform context}
+    image: archguard/platform:4h-synthetic-local
+    environment:
+      SPRING_PROFILES_ACTIVE: oidc,local-compose,agent-synthetic
+      ARCHGUARD_AGENT_ENABLED: ${ARCHGUARD_AGENT_ENABLED:-true}
+      ARCHGUARD_AGENT_SYNTHETIC_ENABLED: "true"
+      ARCHGUARD_AGENT_SYNTHETIC_SCENARIO: ${ARCHGUARD_AGENT_SYNTHETIC_SCENARIO:-SUPPORTED}
+      ARCHGUARD_AGENT_PROVIDER_TIMEOUT: ${ARCHGUARD_AGENT_PROVIDER_TIMEOUT:-2s}
+    volumes:
+      - ${ARCHGUARD_SOURCES_CONTEXT:?provide pinned synthetic Samples context}:/sources:ro
+  scanner-runner:
+    volumes:
+      - ${ARCHGUARD_SOURCES_CONTEXT:?provide pinned synthetic Samples context}:/sources:ro
+  archguard-web:
+    build:
+      context: ${ARCHGUARD_WEB_CONTEXT:?provide pinned Web context}
+    image: archguard/web:4h-synthetic-local

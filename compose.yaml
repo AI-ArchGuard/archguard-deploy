@@ -36,7 +36,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.5.3@sha256:5a236ae4dd8ece77490115bace15a11a4d15e9cbcf58a490b95a7da2cd71d32a
-    command: [start-dev, --import-realm, --http-relative-path=/auth, --hostname=http://localhost:8080/auth]
+    command: [start-dev, --import-realm, --http-relative-path=/auth, "--hostname=http://localhost:${ARCHGUARD_LOCAL_PORT:-8080}/auth"]
     env_file: ./.local/runtime.env
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
@@ -57,7 +57,7 @@ services:
       ARCHGUARD_DB_URL: jdbc:postgresql://postgres:5432/archguard
       ARCHGUARD_DB_USERNAME: archguard
       ARCHGUARD_DB_PASSWORD: ${ARCHGUARD_LOCAL_DB_PASSWORD:?run scripts/local-up first}
-      ARCHGUARD_OIDC_ISSUER_URI: http://localhost:8080/auth/realms/archguard
+      ARCHGUARD_OIDC_ISSUER_URI: http://localhost:${ARCHGUARD_LOCAL_PORT:-8080}/auth/realms/archguard
       ARCHGUARD_OIDC_JWK_SET_URI: http://keycloak:8080/auth/realms/archguard/protocol/openid-connect/certs
       ARCHGUARD_OIDC_AUDIENCE: archguard-platform
       ARCHGUARD_OIDC_ALLOW_HTTP: "true"
@@ -109,15 +109,15 @@ services:
     build:
       context: ${ARCHGUARD_WEB_CONTEXT:-../archguard-web}
       args:
-        VITE_OIDC_AUTHORITY: http://localhost:8080/auth/realms/archguard
+        VITE_OIDC_AUTHORITY: http://localhost:${ARCHGUARD_LOCAL_PORT:-8080}/auth/realms/archguard
         VITE_OIDC_CLIENT_ID: archguard-web
-        VITE_OIDC_REDIRECT_URI: http://localhost:8080/auth/callback
-        VITE_OIDC_POST_LOGOUT_REDIRECT_URI: http://localhost:8080/
+        VITE_OIDC_REDIRECT_URI: http://localhost:${ARCHGUARD_LOCAL_PORT:-8080}/auth/callback
+        VITE_OIDC_POST_LOGOUT_REDIRECT_URI: http://localhost:${ARCHGUARD_LOCAL_PORT:-8080}/
     image: archguard/web:0.2.0
     depends_on:
       archguard-platform: {condition: service_healthy}
       keycloak: {condition: service_started}
-    ports: ["127.0.0.1:8080:8080"]
+    ports: ["127.0.0.1:${ARCHGUARD_LOCAL_PORT:-8080}:8080"]
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m

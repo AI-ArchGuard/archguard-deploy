@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Agent synthetic acceptance
+
+- Add an explicit, fixed-context synthetic Compose override and an isolated loopback/OIDC port.
+- Verify real API explanation/summary/citations, immutable versions and failures without changing gates; keep browser acceptance separate.
+- Refresh short-lived local admin credentials before deleting the exact temporary acceptance client.
+- Record candidate compatibility and rollback limits; no real-model or formal Stage 4 release.
+
 所有重要变更记录在此文件。版本遵循语义化版本；项目开发期从 `0.x.y` 开始。
 
 ## [Unreleased]

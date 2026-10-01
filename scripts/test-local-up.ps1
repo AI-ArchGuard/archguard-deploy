@@ -37,6 +37,25 @@ try {
     throw "Expected two Compose starts, got $global:archguardTestDockerCalls"
   }
   Write-Output 'Local startup credential reuse: PASS'
+
+  $alternateRoot = Join-Path $testRoot 'alternate'
+  New-Item -ItemType Directory -Path (Join-Path $alternateRoot 'scripts'), (Join-Path $alternateRoot 'keycloak') -Force | Out-Null
+  Copy-Item -LiteralPath $localUp -Destination (Join-Path $alternateRoot 'scripts/local-up.ps1')
+  Copy-Item -LiteralPath (Join-Path $sourceRoot 'keycloak/realm.template.json') -Destination (Join-Path $alternateRoot 'keycloak/realm.template.json')
+  $alternateUp = Join-Path $alternateRoot 'scripts/local-up.ps1'
+  & $alternateUp -Port 8081 6>$null | Out-Null
+  $alternateRealm = Get-Content (Join-Path $alternateRoot '.local/keycloak/realm.json') -Raw | ConvertFrom-Json
+  $web = $alternateRealm.clients | Where-Object { $_.clientId -eq 'archguard-web' }
+  if ($web.redirectUris[0] -ne 'http://localhost:8081/auth/callback' -or $web.webOrigins[0] -ne 'http://localhost:8081') {
+    throw 'Alternate loopback port did not update OIDC callbacks'
+  }
+  $beforeMismatch = $global:archguardTestDockerCalls
+  $rejected = $false
+  try { & $alternateUp -Port 8082 6>$null | Out-Null } catch { $rejected = $true }
+  if (-not $rejected -or $global:archguardTestDockerCalls -ne $beforeMismatch) {
+    throw 'Existing credential state allowed an inconsistent port change'
+  }
+  Write-Output 'Local startup isolated port and mismatch rejection: PASS'
 }
 finally {
   Remove-Item Function:\docker -ErrorAction SilentlyContinue
