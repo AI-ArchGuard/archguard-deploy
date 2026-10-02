@@ -2,6 +2,9 @@
 
 ## Unreleased — Agent synthetic acceptance
 
+- Add default-off Web configuration, an explicit rollback proxy fence and pinned old-application rehearsal without deleting migrations/history.
+- Verify old governance/Scanner Runner work, unchanged historical snapshots and restored citations; real egress/release and database disaster recovery remain out of scope.
+
 - Add an explicit, fixed-context synthetic Compose override and an isolated loopback/OIDC port.
 - Verify real API explanation/summary/citations, immutable versions and failures without changing gates; keep browser acceptance separate.
 - Refresh short-lived local admin credentials before deleting the exact temporary acceptance client.

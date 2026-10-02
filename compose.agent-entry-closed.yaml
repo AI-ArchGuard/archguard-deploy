@@ -1,0 +1,13 @@
+# First rollback step: current Web with no Agent entry or API forwarding.
+# Platform calls remain disabled before either application is rolled back.
+services:
+  archguard-platform:
+    environment:
+      ARCHGUARD_AGENT_ENABLED: "false"
+  archguard-web:
+    image: archguard/web:4h-entry-off-local
+    build:
+      args:
+        VITE_AGENT_UI_ENABLED: "false"
+    volumes:
+      - ${ARCHGUARD_ROLLBACK_NGINX_CONFIG:?provide pinned rollback proxy config}:/etc/nginx/conf.d/default.conf:ro

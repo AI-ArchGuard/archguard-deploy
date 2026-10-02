@@ -45,6 +45,7 @@ def terminal(url, token, request_id):
 
 
 def verify(context, expected):
+    require(context["pr_revision_id"], "Agent acceptance requires the additive trusted PR revision field")
     url, token = context["project_url"], context["token"]
     job_url = url + "/scan-jobs/" + context["scan_job_id"]
     before_job = request(job_url, token=token)[1]
