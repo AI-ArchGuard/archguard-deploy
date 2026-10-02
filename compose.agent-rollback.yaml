@@ -1,0 +1,16 @@
+# Local rehearsal only. Images must be built from the matrix-pinned old applications.
+# Add after compose.agent-synthetic.yaml; do not remove any volume or migration.
+services:
+  archguard-platform:
+    image: archguard/platform:4h-v0.4.0-rollback-local
+    environment:
+      SPRING_PROFILES_ACTIVE: oidc,local-compose
+      ARCHGUARD_AGENT_ENABLED: "false"
+      ARCHGUARD_AGENT_SYNTHETIC_ENABLED: "false"
+  archguard-web:
+    image: archguard/web:4h-v0.2.0-rollback-local
+    build:
+      args:
+        VITE_AGENT_UI_ENABLED: "false"
+    volumes:
+      - ${ARCHGUARD_ROLLBACK_NGINX_CONFIG:?provide pinned rollback proxy config}:/etc/nginx/conf.d/default.conf:ro

@@ -21,4 +21,6 @@ services:
   archguard-web:
     build:
       context: ${ARCHGUARD_WEB_CONTEXT:?provide pinned Web context}
-    image: archguard/web:4h-synthetic-local
+      args:
+        VITE_AGENT_UI_ENABLED: ${ARCHGUARD_AGENT_UI_ENABLED:-true}
+    image: ${ARCHGUARD_AGENT_WEB_IMAGE:-archguard/web:4h-synthetic-local}

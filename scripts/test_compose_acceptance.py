@@ -54,6 +54,27 @@ class ComposeBoundaryTest(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 config.verify(model)
 
+    def test_rollback_requires_old_images_closed_model_and_readonly_proxy_guard(self):
+        model = self.model()
+        platform = model["services"]["archguard-platform"]
+        platform["image"] = "archguard/platform:4h-v0.4.0-rollback-local"
+        platform["environment"].update(SPRING_PROFILES_ACTIVE="oidc,local-compose", ARCHGUARD_AGENT_ENABLED="false", ARCHGUARD_AGENT_SYNTHETIC_ENABLED="false")
+        web = model["services"]["archguard-web"]
+        web.update(image="archguard/web:4h-v0.2.0-rollback-local", build={"args": {"VITE_AGENT_UI_ENABLED": "false"}},
+                   volumes=[{"type": "bind", "target": "/etc/nginx/conf.d/default.conf", "read_only": True}])
+        config.verify_rollback(model)
+        mutations = [
+            lambda m: m["services"]["archguard-platform"]["environment"].update(ARCHGUARD_AGENT_ENABLED="true"),
+            lambda m: m["services"]["archguard-web"]["build"]["args"].update(VITE_AGENT_UI_ENABLED="true"),
+            lambda m: m["services"]["archguard-web"]["volumes"][0].update(read_only=False),
+            lambda m: m["services"]["archguard-web"].update(image="unpinned:latest"),
+        ]
+        for mutation in mutations:
+            changed = copy.deepcopy(model)
+            mutation(changed)
+            with self.assertRaises(AssertionError):
+                config.verify_rollback(changed)
+
 
 if __name__ == "__main__":
     unittest.main()

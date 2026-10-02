@@ -14,6 +14,8 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 阶段 4H 的[合成 Compose 验收](docs/agent-synthetic-compose-acceptance.md)与[固定候选矩阵](compatibility/agent-synthetic.md)仅使用无网络确定性适配器，真实 DeepSeek 外发和正式 `v0.5.0-agent` 发布仍暂停。可在独立工作树用 8081 与阶段 3 环境并存；不清空旧卷、不启用 Gateway/Evals。
 
+[4H 应用回滚演练](docs/agent-rollback-rehearsal.md)补齐默认关闭入口、代理拒绝 Agent 路径、旧应用在保留 V8/V10 数据库上的运行及当前应用恢复；只验证独立合成环境，不代表真实模型发布或数据库灾备。
+
 - 提供本地 Docker Compose、CI/Staging/Production 部署方案和健康检查。
 - 记录各仓库可部署版本的兼容矩阵、发布顺序和回滚步骤。
 - 管理可观测配置、资源限制、备份恢复与演练脚本。

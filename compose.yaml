@@ -113,6 +113,7 @@ services:
         VITE_OIDC_CLIENT_ID: archguard-web
         VITE_OIDC_REDIRECT_URI: http://localhost:${ARCHGUARD_LOCAL_PORT:-8080}/auth/callback
         VITE_OIDC_POST_LOGOUT_REDIRECT_URI: http://localhost:${ARCHGUARD_LOCAL_PORT:-8080}/
+        VITE_AGENT_UI_ENABLED: ${ARCHGUARD_AGENT_UI_ENABLED:-false}
     image: archguard/web:0.2.0
     depends_on:
       archguard-platform: {condition: service_healthy}

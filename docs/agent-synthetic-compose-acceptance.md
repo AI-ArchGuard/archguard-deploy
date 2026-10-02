@@ -1,6 +1,6 @@
 # Agent 合成 Compose 验收
 
-状态：合成 API 与真实 Web 操作通过；真实模型发布、旧应用完整回退和阶段退出仍未验收。唯一阶段报告只在退出关卡满足时创建，当前执行证据保留在 [4H Issue](https://github.com/AI-ArchGuard/archguard-deploy/issues/10)。
+状态：合成 API 与真实 Web 操作通过；独立合成[旧应用回退](agent-rollback-rehearsal.md)已验证；真实模型发布和阶段退出仍未验收。唯一阶段报告只在退出关卡满足时创建，当前执行证据保留在 [4H Issue](https://github.com/AI-ArchGuard/archguard-deploy/issues/10)。
 
 本组合只有无网络的确定性适配器，**不会调用 DeepSeek**。固定文本、100/80 Token 与 260 µUSD 都是合成测试值，不能代表真实模型质量、Token 估算、供应商延迟或账单。ADR-0011/#43 的账户级审批仍缺失。
 
@@ -15,6 +15,7 @@ $env:ARCHGUARD_SCANNER_CONTEXT = '<pinned-scanner-checkout>'
 $env:ARCHGUARD_PLATFORM_CONTEXT = '<pinned-platform-checkout>'
 $env:ARCHGUARD_WEB_CONTEXT = '<pinned-web-checkout>'
 $env:ARCHGUARD_SOURCES_CONTEXT = '<pinned-synthetic-samples-checkout>'
+$env:ARCHGUARD_AGENT_UI_ENABLED = 'true' # only this synthetic override opts in; base Web defaults off
 .\scripts\local-up.ps1 -Port 8081 6>$null
 docker compose --env-file .local/runtime.env config --quiet
 docker compose --env-file .local/runtime.env config --format json | py scripts/verify-agent-compose-config.py -

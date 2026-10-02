@@ -32,7 +32,7 @@ jobs:
         run: python3 -m unittest discover -s ci -p 'test_*.py'
       - name: Check Compose acceptance harness syntax
         run: |
-          python3 -m py_compile scripts/verify-governance-compose.py scripts/verify-agent-compose.py
+          python3 -m py_compile scripts/verify-governance-compose.py scripts/verify-agent-compose.py scripts/verify-agent-rollback.py
           python3 -m unittest discover -s scripts -p 'test_*.py'
 
   compose:
@@ -72,6 +72,10 @@ jobs:
           export ARCHGUARD_SOURCES_CONTEXT=../archguard-samples
           docker compose -f compose.yaml -f compose.agent-synthetic.yaml --env-file .local/runtime.env config --format json > .local/agent-compose.json
           python3 scripts/verify-agent-compose-config.py .local/agent-compose.json
+          export ARCHGUARD_ROLLBACK_NGINX_CONFIG="$PWD/rollback/web.nginx.conf"
+          docker compose -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-entry-closed.yaml --env-file .local/runtime.env config --quiet
+          docker compose -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-rollback.yaml --env-file .local/runtime.env config --format json > .local/rollback-compose.json
+          python3 scripts/verify-agent-compose-config.py .local/rollback-compose.json --rollback
 
   windows-startup:
     runs-on: windows-latest

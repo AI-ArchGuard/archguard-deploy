@@ -31,6 +31,11 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def callback_revision(pull_request: dict) -> str | None:
+    # Additive 4F field is absent on the released Stage 3 application.
+    return pull_request.get("currentHeadRevisionId")
+
+
 def request(url: str, method: str = "GET", *, token: str | None = None,
             payload: object | None = None, content_type: str | None = None,
             headers: dict[str, str] | None = None,
@@ -314,7 +319,7 @@ def run(base_url: str, scanner: Path, samples: Path, on_complete=None) -> None:
                          "report_sha256": hashlib.sha256(violation).hexdigest(),
                          "rule_set_version_id": version_id, "provider_id": provider_id,
                          "synthetic_report": violation,
-                         "pr_revision_id": introduced_pr["currentHeadRevisionId"],
+                         "pr_revision_id": callback_revision(introduced_pr),
                          "gates": [failed_gate, excepted_gate, expired_gate, repaired_gate]})
     finally:
         cleanup_client(base_url, runtime, client_uuid)

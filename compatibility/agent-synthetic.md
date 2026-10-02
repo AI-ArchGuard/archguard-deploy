@@ -8,7 +8,7 @@
 | Scanner | `d4b8e98bfdabbc78f65910ed37e3062167d04b07`；已发布 `v0.2.1` 兼容线 | Result/Rules Schema `0.1.0`；CLI `0/2/64/70` 不变 |
 | Samples | `a53a5bbea2630aac2135aa217d961cdbb77851a3` | 固定合成治理源码、Agent 契约/安全案例；无客户源码 |
 | Platform | `b7cfa56fa513d1671840160603781c2b6de440d3`（#47） | Agent API/输出 `0.1.0`；文档 API `0.1.0`；主 Flyway V1–V8、独立 Agent V9/V10 |
-| Web | `1cefa2867e7df53d5cf63d36a2fd88cece9c4899`（#12） | 固定 Platform 契约快照；只消费校验后的建议与引用 |
+| Web | `cdd41cf3ecbb0779364c0b3c88140390c5328deb`（#13） | 固定 Platform 契约快照；建议/引用消费；默认关闭构建时入口开关 |
 | Deploy | 本矩阵所在提交；合并/CI 证据见 #10 | 基础 Compose + 显式合成 override；仅回环 Web 端口 |
 | PostgreSQL / Keycloak | 沿用 `compose.yaml` 中的固定 digest | `17.7-alpine` / `26.5.3`；只做本地演示，不声明生产身份部署 |
 
@@ -24,4 +24,6 @@ Platform 先运行主迁移至 V8，Agent 独立迁移至 V10；Agent 迁移不�
 
 正式环境先关闭 Web Agent 入口及 Project/模型出口，再关闭部署 Agent 开关，最后回退 Web/Platform 应用。保留 V8、V9、V10 与文档、解释、预算、审计；不改写旧迁移、不做 down migration、不清空卷。
 
-当前验证只覆盖部署 `ARCHGUARD_AGENT_ENABLED=false` 后扫描/门禁继续运行、历史记录仍可读，以及重启后的持久化。Web 独立入口/Project 的真实模型开关与真实适配器还未交付；旧 `v0.4.0` Platform / `v0.2.0` Web 对 V8/V10 数据库的完整应用回退未演练，不得声称已经通过。该限制与真实外发关卡一起阻止正式阶段发布。合成验收环境停止采用 `down` 不带 `--volumes`。
+2026-10-02 的[独立合成回滚演练](../docs/agent-rollback-rehearsal.md)已验证：先关闭当前 Web 入口及 Agent API 转发、关闭 Platform 调用，再回退旧 `v0.4.0` 发布 JAR / `v0.2.0` 代码重建 Web；旧应用健康并执行新治理/Runner 工作。九组迁移/文档/解释/预算/Agent 审计记录摘要不变，恢复当前应用后旧引用可读。Web #13 [main CI](https://github.com/AI-ArchGuard/archguard-web/actions/runs/36983615611) 成功；本 Deploy 变更合并后的 CI 证据见 #10。
+
+Web 开关为构建时展示控制，需重建，不替代后台控制；回滚代理额外对 Agent/文档路径返回明确 503。旧 Web 为适配 8081 重建，不冒充发布 tar.gz。真实 Project/Deployment 启用及适配器未交付；数据库备份恢复和生产负载未演练。真实外发仍阻止正式发布。停止合成环境用 `down` 不带 `--volumes`。
