@@ -35,6 +35,7 @@ try {
   if (($realm.users | Where-Object {$_.username -eq 'agent-owner'}).id -ne $global:archguardOwnerUsers[0].id) { throw 'Realm canonical UUID mismatch' }
   $acl = Get-Acl -LiteralPath $record
   if (-not $acl.AreAccessRulesProtected -or $acl.Access.Count -ne 2) { throw 'Private owner ACL missing' }
+  if ($acl.GetOwner([Security.Principal.SecurityIdentifier]) -ne [Security.Principal.WindowsIdentity]::GetCurrent().User) { throw 'Private file is not owned by the current operator' }
   & $setup -RuntimeDirectory "$testRoot/runtime" -PlatformContext "$testRoot/context" -WebContext "$testRoot/context" -SourcesContext "$testRoot/context" | Out-Null
   if ($first -ne [IO.File]::ReadAllText($config) -or $firstRecord -ne [IO.File]::ReadAllText($record) -or $global:archguardOwnerCreates -ne 1) { throw 'Setup rotated existing identity/state' }
   $global:archguardOwnerUsers[0].id = [guid]::NewGuid().ToString()

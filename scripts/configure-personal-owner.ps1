@@ -22,7 +22,16 @@ function Protect-PrivatePath([string]$path, [bool]$directory) {
   $system = [Security.Principal.SecurityIdentifier]::new('S-1-5-18')
   # Modify DACL only; do not request SACL/owner privileges from a non-admin process.
   $acl = Get-Acl -LiteralPath $path
-  if ($acl.GetOwner([Security.Principal.SecurityIdentifier]) -ne $identity) { throw 'Private path owner differs from the current user' }
+  $currentOwner = $acl.GetOwner([Security.Principal.SecurityIdentifier])
+  if ($currentOwner -ne $identity) {
+    # Elevated Windows creates files owned by BUILTIN Administrators. Restrict those
+    # to the current operator; never take over another user's or SYSTEM's files.
+    $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+    if ($currentOwner.Value -ne 'S-1-5-32-544' -or -not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+      throw 'Private path owner differs from the current user'
+    }
+    $acl.SetOwner($identity)
+  }
   $acl.SetAccessRuleProtection($true, $false)
   foreach ($rule in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($rule) }
   foreach ($sid in @($identity, $system)) {
