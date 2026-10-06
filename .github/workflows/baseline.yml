@@ -34,6 +34,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/verify-governance-compose.py scripts/verify-agent-compose.py scripts/verify-agent-rollback.py
           python3 -m unittest discover -s scripts -p 'test_*.py'
+          node --check scripts/verify-personal-login.mjs
 
   compose:
     runs-on: ubuntu-latest
@@ -76,6 +77,18 @@ jobs:
           docker compose -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-entry-closed.yaml --env-file .local/runtime.env config --quiet
           docker compose -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-rollback.yaml --env-file .local/runtime.env config --format json > .local/rollback-compose.json
           python3 scripts/verify-agent-compose-config.py .local/rollback-compose.json --rollback
+      - name: Verify isolated personal credential configuration and volumes
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ARCHGUARD_PLATFORM_CONTEXT=../archguard-platform
+          export ARCHGUARD_WEB_CONTEXT=../archguard-web
+          export ARCHGUARD_CREDENTIAL_OWNER_ID=22222222-2222-4222-8222-222222222222
+          export ARCHGUARD_CREDENTIAL_DEPLOYMENT_ID=33333333-3333-4333-8333-333333333333
+          docker compose --profile credential-bootstrap -f compose.yaml -f compose.personal-credentials.yaml --env-file .local/runtime.env config --format json > .local/credential-compose.json
+          python3 scripts/verify-credential-compose-config.py .local/credential-compose.json
+          jq -e '.services["archguard-platform"].environment.ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED == "false" and .services["archguard-web"].build.args.VITE_CREDENTIAL_UI_ENABLED == "false"' .local/credential-compose.json
+          python3 scripts/test-credential-volumes.py
 
   windows-startup:
     runs-on: windows-latest
@@ -86,7 +99,15 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/test-local-up.ps1
+          ./scripts/test-personal-owner.ps1
           $runner = [System.IO.File]::ReadAllBytes('runner/runner.sh')
           if ([System.Text.Encoding]::UTF8.GetString($runner).Contains("`r")) {
             throw 'Bind-mounted runner/runner.sh must use LF line endings'
           }
+          $credentialScript = [System.IO.File]::ReadAllBytes('scripts/credential-volumes.sh')
+          if ([System.Text.Encoding]::UTF8.GetString($credentialScript).Contains("`r")) {
+            throw 'Credential volume script must use LF line endings'
+          }
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/configure-personal-owner.ps1", [ref]$null, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count) { throw 'Personal owner setup syntax invalid' }
