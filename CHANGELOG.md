@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Personal credential runtime
+
+- Add default-off personal credential Compose wiring, a dedicated OIDC owner with private initial-password record and authoritative server UUID.
+- Bootstrap independent private master/ciphertext volumes; refuse incomplete, symlinked or unsafe state without rotation/repair.
+- Test localhost-only exposure, default switches, disabled model egress, immutable bootstrap and Windows owner preparation.
+- Keep synthetic acceptance history, migrations and existing runtime credentials; no real model call, fee approval or stage release.
+
 ## Unreleased — Agent synthetic acceptance
 
 - Add default-off Web configuration, an explicit rollback proxy fence and pinned old-application rehearsal without deleting migrations/history.

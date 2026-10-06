@@ -16,6 +16,8 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 [4H 应用回滚演练](docs/agent-rollback-rehearsal.md)补齐默认关闭入口、代理拒绝 Agent 路径、旧应用在保留 V8/V10 数据库上的运行及当前应用恢复；只验证独立合成环境，不代表真实模型发布或数据库灾备。
 
+[个人只写凭据托管](docs/personal-credential-runtime.md)提供独立、默认关闭的 Web/后端管理入口、专用 OIDC owner、分离的主密钥/密文卷与本机配置测试。仅个人环回部署；不使用聊天 Key，不启用真实模型或提前关闭阶段。
+
 - 提供本地 Docker Compose、CI/Staging/Production 部署方案和健康检查。
 - 记录各仓库可部署版本的兼容矩阵、发布顺序和回滚步骤。
 - 管理可观测配置、资源限制、备份恢复与演练脚本。
