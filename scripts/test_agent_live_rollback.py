@@ -95,9 +95,9 @@ def manifest():
     return {"schemaVersion": "0.1.0", "kind": "PERSONAL_LIVE_FINAL_ROLLBACK",
             "deploymentId": "44444444-4444-4444-8444-444444444444",
             "candidates": {
-                "docs": "0d0f5ede505f9afa6f369226eb7263ed123dfa3f",
-                "platform": "9f68dea97fca7893961c8305ce84ff215be9d0df",
-                "web": "961244ef3486967186cd4a41375fb29d25786043",
+                "docs": "077a7c5afa12557543ee04e14321701c3537931a",
+                "platform": "903ddc5987e0f6e63091ee4897d4311b9c41cbe9",
+                "web": "5c5a7a021210876cda55850d7898e11aa52781aa",
                 "scanner": "d4b8e98bfdabbc78f65910ed37e3062167d04b07",
                 "samples": "a53a5bbea2630aac2135aa217d961cdbb77851a3",
                 "deploy": "5" * 40},
@@ -256,6 +256,20 @@ class FinalHistoryContractTest(unittest.TestCase):
                 audit[key] = value
             with self.subTest(mutation=mutation), self.assertRaises(AssertionError):
                 self.parse(values)
+
+    def test_manifest_accepts_exact_approved_1017_candidate_tuple(self):
+        # Canonical merge SHAs are independent literals, never production CANDIDATES.
+        rollback.validate_manifest(manifest())
+
+    def test_manifest_rejects_old_engineering_tuple_with_other_fields_valid(self):
+        candidate = manifest()
+        candidate["candidates"].update({
+            "docs": "0d0f5ede505f9afa6f369226eb7263ed123dfa3f",
+            "platform": "9f68dea97fca7893961c8305ce84ff215be9d0df",
+            "web": "961244ef3486967186cd4a41375fb29d25786043",
+        })
+        with self.assertRaises(AssertionError):
+            rollback.validate_manifest(candidate)
 
     def test_manifest_pins_kind_proofs_actual_deploy_and_snapshot_binding(self):
         candidate = manifest()

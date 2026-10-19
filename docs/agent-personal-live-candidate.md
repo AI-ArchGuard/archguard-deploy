@@ -1,6 +1,6 @@
 # 个人 Agent 受限出口候选与最终回滚手册
 
-这是实现候选及后续操作手册，不是运行验收、Release 或唯一阶段报告。当前固定 Platform/Web SHA 是保留旧 10-15 模型映射的工程基线；人工批准的新 `DeepSeek-V4.1-Flash-1017` 映射仍需后续版本化提供方/消费者契约与新 main SHA，不能拿旧 pin 宣称最终运行候选或验收。当前默认关闭真实 Agent、live、inventory、凭据管理和三个 Web 构建入口，官方地址集合默认为空。实现、离线/临时容器验证不消费模型授权。实际栈启用必须等后续映射工作、全部仓库 PR/main CI、固定制品和人工绑定条件通过；本实现任务不启动活动环境、不读取运行 Secret、不查询模型账户。
+这是显式 1017 候选及后续操作手册，不是运行验收、Release 或唯一阶段报告。当前固定 Docs/Platform/Web SHA 已合并且 main CI 成功，提供方 Settings/ack `0.4.0` 与消费者显式确认精确配对获批 `DeepSeek-V4.1-Flash-1017`；来源和 CI 见兼容矩阵。旧 10-15 工程组合不再是当前候选，历史记录保留。当前默认关闭真实 Agent、live、inventory、凭据管理和三个 Web 构建入口，官方地址集合默认为空。实现、离线/临时容器验证不消费模型授权。实际栈启用仍须本 Deploy PR/main CI、合并后真实 Deploy SHA、固定制品和新鲜人工绑定条件通过；本实现任务不启动活动环境、不读取运行 Secret、不查询模型账户。
 
 固定源码、制品差异和回滚顺序见[兼容矩阵](../compatibility/agent-personal-live.md)。历史[九表合成演练](agent-rollback-rehearsal.md)保持原语义；这里新增的 21 表最终校验不能用旧报告替代。Scanner Result/Rules Schema、确定性 Findings、门禁与退出码保持不变，不启用 Gateway/Evals。
 
@@ -32,7 +32,7 @@ python scripts/test-agent-inventory-volume.py --image $guardImage
 2. 继续使用同一 `archguard-agent-4h` project、8081、原配套 runtime/credentials 配置、deployment UUID 和全部既有卷。8080 环境不动。Keycloak 当前账号/已改密码不以导入种子恢复；不删除/重建 Keycloak，不重置账号，不自动恢复旧 Key 或临时密码。
 3. 只由所有者在原只写 UI 输入新 Key。不要使用聊天中暴露的 Key，不探测有效性、余额、账户或新增请求。不把 Key 放入 Compose/JSON/环境变量/脚本。此前的凭据状态读取及凭据卷保留比较须在最终 capture 前完成；状态 GET 可能访问后端密文并记审计。
 4. 必须新建符合当前 cost policy 的明确 Project enablement 和批准 batch。旧 acknowledgement 缺少当前策略/绑定就拒绝，不能自动迁移、沿用批准或自动选最新 Project/batch。固定 current credentialVersion、deployment/project/batch/inventory UUID、manifest SHA、networkCheckRef、secretCheckRef 和有效期，均不能通配。
-5. 官方协议、价格和模型映射必须在实际两次请求前重新核对。2026-10-18 的人工更新只涉及 `DeepSeek-V4.1-Flash-1017` 官方映射；其他条件及总计两次上限不变，不能推导更多调用。现有 Platform/Web 仍固定旧 10-15 映射，需另行版本化增量契约、验证并更新最终 pins；不能仅改说明或把旧快照冒充新契约。现有固定请求名 `deepseek-flash` 与获批映射必须核验一致，否则停止，不擅改 endpoint/model 或价格策略。固定 `/responses`、无工具/会话/流/重试的既有协议不变。
+5. 官方协议、价格和模型映射必须在实际两次请求前重新核对。2026-10-18 的人工更新只涉及 `DeepSeek-V4.1-Flash-1017` 官方映射；其他条件及总计两次上限不变，不能推导更多调用。当前候选使用 Settings/ack `0.4.0` 与精确 1017 配对；Batch `0.3.0`、live API/输出和 Scanner Schema `0.1.0` 不变。旧确认可读、撤销、独立结算，但不得静默升级为当前批准或产生新真实发送。固定请求名及单元素响应白名单均仅为 `deepseek-flash`，公告快照名不能加入白名单；与获批映射不一致即停止，不擅改 endpoint/model 或价格策略。固定 `/responses`、非流式、无工具/会话/重试、`reasoning.effort=none`、`tool_choice=none`、`store=false` 及上下文价格版本 `deepseek-flash-context-peak-usd-2026-10-15` 不变。
 6. 每次完整请求至多 6000 UTF-8 字节、输出至多 1500 Token；输入 8000 是调用后的观察阈值，不是增加请求大小的许可。每次预留 316373 microUSD，单次/批次上限 350000/700000，Project/部署日上限 5000000/20000000。费用、真实 usage 或引用异常立即停止，无探测、自动重试或失败替代。
 
 ## 新的受控 inventory 原生卷
@@ -88,7 +88,7 @@ docker compose @live stop archguard-platform
 ```
 
 3. 在 capture 前由受控操作员比较原 credential-master/ciphertext 卷的身份、权限、大小和本地摘要；共享证据只写 unchanged 布尔，不公开文件内容或其摘要。此工程脚本不访问凭据卷。所有凭据状态 GET 均安排在 capture 前，之后 `agent.`、`agent_document.`、`AGENT_CREDENTIAL_`（包括 null-project、失败/拒绝/STATUS）不得再追加审计。
-4. 在固定 Deploy `.local/agent-personal-live/` 准备私有 `candidate.json`：schemaVersion `0.1.0`、kind `PERSONAL_LIVE_FINAL_ROLLBACK`、实际 deploymentId、矩阵中的五个 `candidates` SHA + 实际合并 `candidates.deploy` SHA、namespaceProofRef、configProofRef、仅在上述完成后置 true 的 shutdownComplete。当前 verifier 只接受本工程基线 pins；映射后续须显式审查并版本化更新候选绑定，不能绕过校验或把当前 baseline 当作新运行候选。默认省略 allowedAuditAppends；若旧应用受控确定性旅程需要追加审计，必须事先列出确切 `[action, projectUUID, traceId]` 三元组，不能用前缀/通配/事后补许可或脚本自动生成集合。该布尔和 ref 是操作员绑定，不替代运行证明。
+4. 在固定 Deploy `.local/agent-personal-live/` 准备私有 `candidate.json`：schemaVersion `0.1.0`、kind `PERSONAL_LIVE_FINAL_ROLLBACK`、实际 deploymentId、矩阵中的五个 `candidates` SHA + 实际合并 `candidates.deploy` SHA、namespaceProofRef、configProofRef、仅在上述完成后置 true 的 shutdownComplete。当前 verifier 只接受矩阵中的精确 1017 新组合，拒绝旧工程组合；不接受多候选、通配或摘要绕过。Deploy SHA 仍由操作员在本 PR 合并/main CI 后填入，不能使用旧基线、PR head 或伪造 self-pin。默认省略 allowedAuditAppends；若旧应用受控确定性旅程需要追加审计，必须事先列出确切 `[action, projectUUID, traceId]` 三元组，不能用前缀/通配/事后补许可或脚本自动生成集合。该布尔和 ref 是操作员绑定，不替代运行证明。
 5. Windows 目录与文件必须当前用户所有，仅 owner/SYSTEM 有 ALLOW 权限，无链接/reparse。POSIX 要求当前用户所有、目录 0700/文件 0600。操作员事先设置私有权限，校验器只读检查，不更改 ACL；它固定使用系统 PowerShell 模块、五秒超时、env-carried literal path，只接收布尔。ACL 不可用则拒绝写入。private 路径必须排除 Git、所有实际 Docker context、包、日志、浏览器附件和公开 CI artifacts。
 
 ```powershell

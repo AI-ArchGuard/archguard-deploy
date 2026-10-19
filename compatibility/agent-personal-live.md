@@ -1,18 +1,20 @@
 # 个人 Agent 最终候选兼容矩阵（未发布）
 
-状态：受限出口与最终只读回滚的工程基线。不是正式 `v0.5.0-agent`，不表示活动环境或两次真实模型验收已通过。当前 Platform/Web 固定 SHA 保留旧 10-15 模型映射；获批 `DeepSeek-V4.1-Flash-1017` 需要后续版本化提供方/消费者契约及新 main SHA 才能成为最终 runtime candidate。这项后续不属于本 Deploy 实现，不能用旧 pin/快照冒充。操作步骤、费用/授权、21 表历史及隐私要求见[候选手册](../docs/agent-personal-live-candidate.md)。历史 synthetic 矩阵与报告不重写。
+状态：获批 `DeepSeek-V4.1-Flash-1017` 的显式提供方/消费者候选组合，替代旧 10-15 工程组合。Docs、Platform、Web 已合并且 main CI 成功；本 Deploy 变更仍须完成自身审查、PR/main CI 及合并后私有 manifest 绑定。不是正式 `v0.5.0-agent`，不表示活动环境或两次真实模型验收已通过。操作步骤、费用/授权、21 表历史及隐私要求见[候选手册](../docs/agent-personal-live-candidate.md)。历史 synthetic 矩阵与报告不重写。
 
 ## 固定来源与实际制品
 
-- Docs：`0d0f5ede505f9afa6f369226eb7263ed123dfa3f`；ADR-0012/0013/0014 接受语义。2026-10-18 新人工确认仅更新 `DeepSeek-V4.1-Flash-1017` 映射，调用条件和次数不增加；实际前仍重核官方协议/映射/价格。
-- Platform：`9f68dea97fca7893961c8305ce84ff215be9d0df`；Maven 仍 `0.4.0`，Agent/API `0.1.0`，主 Flyway V1–V8、Agent baseline8 + V9–V16。当前 JAR 来源 SHA、构建字节及正常 Flyway validate/迁移资源 SHA 必须另外核对。
-- Web：`961244ef3486967186cd4a41375fb29d25786043`；package 仍 `0.2.0`。默认 Release tarball 三类 Agent/live/credential UI 关闭；显式 8081 Docker 构建与默认 tarball 字节/参数不同。只有实际核验的构建参数与产物才能证明入口状态，tag 或 package 版本不够。
+- Docs：`077a7c5afa12557543ee04e14321701c3537931a`；main CI `39144567175` 成功。ADR-0015 仅更新获批 `DeepSeek-V4.1-Flash-1017` 映射，保留 ADR-0012/0013/0014 原协议、费用和调用次数；实际前仍重核官方协议/映射/价格。
+- Platform：`903ddc5987e0f6e63091ee4897d4311b9c41cbe9`；main CI `39191487577` 成功。Maven 仍 `0.4.0`；Settings/ack 契约 `0.4.0` 明确配对 1017，Batch `0.3.0`、live API/输出 `0.1.0`。主 Flyway V1–V8、Agent baseline8 + V9–V16 不变。当前 JAR 来源 SHA、构建字节及正常 Flyway validate/迁移资源 SHA 必须另外核对。
+- Web：`5c5a7a021210876cda55850d7898e11aa52781aa`；PR #16 已合并，main CI `39220944637` 成功。package 仍 `0.2.0`；消费 Platform 生成契约，仅提交当前 `0.4.0` 显式确认。默认 Release tarball 三类 Agent/live/credential UI 关闭；显式 8081 Docker 构建与默认 tarball 字节/参数不同。只有实际核验的构建参数与产物才能证明入口状态，tag 或 package 版本不够。
 - Scanner：`d4b8e98bfdabbc78f65910ed37e3062167d04b07`，既有 `0.2.1` 兼容线；Result/Rules Schema `0.1.0`、CLI `0/2/64/70` 不变。
 - Samples：`a53a5bbea2630aac2135aa217d961cdbb77851a3`；受控合成 fixture，无客户源码。
 - Deploy：最终合并 SHA 由操作员在合并/main CI 成功后填入私有 candidate manifest；当前文档不伪造 self-pin/pending SHA。PR/head tree 及本地 image ID 不能冒充合并 SHA 或 registry digest。
 - PostgreSQL：`postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2`；Keycloak：`quay.io/keycloak/keycloak:26.5.3@sha256:5a236ae4dd8ece77490115bace15a11a4d15e9cbcf58a490b95a7da2cd71d32a`，沿用现有 project/身份/卷，不重建 Keycloak。
 
 Platform 原业务 Dockerfile runtime `eclipse-temurin:21-jre-jammy` + apt curl、Web 业务 runtime `nginxinc/nginx-unprivileged:1.29.5-alpine` 不是本变更新增的完整业务供应链锁。保留这项限制，记录实际业务 image/JAR/Web 字节；本任务不修改它们或宣称发布。
+
+该组合仅更新映射确认与候选绑定：请求别名和单元素响应白名单仍为 `deepseek-flash`，固定 `/responses`、非流式、无工具/会话/重试，原 `reasoning.effort=none`、`tool_choice=none`、`store=false` 不变。上下文价格版本仍为 `deepseek-flash-context-peak-usd-2026-10-15`，每请求预留 `316373` microUSD，单次/两次 USD `0.35/0.70`，完整请求 6000 UTF-8 字节、输出 1500 Token、输入 8000 调用后观察阈值及日限额均不变。旧确认可读、撤销和按自身绑定结算，但不得静默升级或用于新真实发送。
 
 ## 测试镜像与依赖证明
 
@@ -24,7 +26,7 @@ CI 先构建/拉取再取得本地不可变 ID，才运行 fake TCP/HTTP fixture
 
 ## 兼容顺序和回滚边界
 
-Docs 语义 → 固定 Samples/Scanner → Platform 合入和 main CI → Web 合入和 main CI → Deploy 审查、全部 CI、单次最终提交和正常 SHA-guarded 合并/main CI → 后续获批映射的版本化 Platform/Web 契约、新 main 和显式更新的最终候选绑定 → 本机运行。原始代码版本仍 `0.4.0/0.2.0`；顺序和版本号不能替代实际 SHA/字节。当前 verifier 拒绝静默替换候选 pins，后续不得通过放松校验来跳过契约变更。所有新 live/UI/管理/来源开关默认 false，官方集合默认空，独立 inventory 原生卷不自动初始化。旧成本 acknowledgement 不升级为新批准。
+已完成来源顺序：Docs ADR-0015/main CI → 固定 Samples/Scanner → Platform 生产者 `0.4.0` 合入/main CI → Web 当前显式确认消费契约合入/main CI。后续顺序：Deploy 审查、全部 CI、正常 SHA-guarded 合并/main CI → 操作员填入真实 Deploy 合并 SHA、核对实际制品并重新绑定 owner/deployment/Project/manifest/来源/batch/templates/current credentialVersion/检查 refs/`0.4.0`/1017/价格与预留策略/有效期及原两次限额 → 本机运行。原始代码版本仍 `0.4.0/0.2.0`；顺序和版本号不能替代实际 SHA/字节。当前 verifier 只接受本矩阵精确新组合并拒绝旧工程组合；不得通过放松校验或多候选接受跳过契约变更。所有新 live/UI/管理/来源开关默认 false，官方集合默认空，独立 inventory 原生卷不自动初始化。旧成本 acknowledgement 不升级为新批准。
 
 实际回滚先完成 Project/batch/worker 关闭、所有入口关闭、guard 清空官方集合，再停 Platform 并 capture。保持同一 `archguard-agent-4h`/8081、原 DB/OIDC/凭据卷与 deployment UUID；不轮换密码、不清空卷、不重建 Keycloak、不改 V1–V16、不 repair/down migration。固定旧应用制品的实际哈希后运行旧治理/Runner 旅程，比较全部 21 表；恢复当前应用时另核对 Flyway validate、JAR资源SHA和引用可读性，调用仍关闭。替换 namespace 必须先停 Platform、等 guard readiness 后启动 Java。
 
