@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Approved 1017 candidate pins
+
+- Explicitly pin merged Docs `077a7c5`, Platform `903ddc5` and Web `5c5a7a0` for the approved `0.4.0` / `DeepSeek-V4.1-Flash-1017` provider/consumer pairing; record exact SHAs and successful source main CI in the compatibility matrix.
+- Update the independent manifest fixture and add acceptance of the new tuple plus rejection of the former engineering tuple; retain exact pin validation, snapshot schema/kind, 21-table history and native ACL/privacy coverage.
+- Keep the singleton `deepseek-flash` alias, original Responses protocol, context price, reservation and USD 0.35/0.70 limits. Deploy self-pin follows merge; runtime binding, real calls, release and stage completion remain later gates.
+
 ## Unreleased — Personal live candidate gate
 
 - Add a default-closed, shared-namespace guard with precise IPv4 peers, bounded readiness and explicit official-flow revocation; preserve credential volumes, deployment identity and V1–V16 history.

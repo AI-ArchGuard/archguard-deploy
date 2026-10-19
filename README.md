@@ -22,6 +22,8 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 个人 live 渲染契约核验版本为 Docker Compose `5.5.1`；CI 使用先核对官方 SHA256 的独立二进制。其他版本须另行证明能保留显式 `create_host_path: false`，详情见候选手册。
 
+当前候选显式固定已合并且 main CI 成功的 Docs ADR-0015、Platform Settings/ack `0.4.0` 与 Web 消费契约，匹配获批 `DeepSeek-V4.1-Flash-1017`；精确 SHA、CI 和兼容版本见固定矩阵。回滚 verifier 仅接受该新组合，旧 10-15 工程组合不再是当前候选。请求/响应别名仍仅 `deepseek-flash`，原协议、价格、费用及两次条件授权不变；Deploy 合并 SHA 仍须合并后填入私有 manifest，运行绑定与验收尚未完成。
+
 - 提供本地 Docker Compose、CI/Staging/Production 部署方案和健康检查。
 - 记录各仓库可部署版本的兼容矩阵、发布顺序和回滚步骤。
 - 管理可观测配置、资源限制、备份恢复与演练脚本。

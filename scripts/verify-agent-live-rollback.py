@@ -57,9 +57,9 @@ AGENT_SCRIPTS = (
     "V15__context_cost_policy.sql", "V16__context_template_request_slots.sql",
 )
 CANDIDATES = {
-    "docs": "0d0f5ede505f9afa6f369226eb7263ed123dfa3f",
-    "platform": "9f68dea97fca7893961c8305ce84ff215be9d0df",
-    "web": "961244ef3486967186cd4a41375fb29d25786043",
+    "docs": "077a7c5afa12557543ee04e14321701c3537931a",
+    "platform": "903ddc5987e0f6e63091ee4897d4311b9c41cbe9",
+    "web": "5c5a7a021210876cda55850d7898e11aa52781aa",
     "scanner": "d4b8e98bfdabbc78f65910ed37e3062167d04b07",
     "samples": "a53a5bbea2630aac2135aa217d961cdbb77851a3",
 }
