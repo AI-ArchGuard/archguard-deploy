@@ -32,7 +32,7 @@ class ComposeBoundaryTest(unittest.TestCase):
             "SPRING_PROFILES_ACTIVE": "oidc,local-compose,agent-synthetic",
             "ARCHGUARD_AGENT_SYNTHETIC_ENABLED": "true",
             "ARCHGUARD_AGENT_SYNTHETIC_SCENARIO": "SUPPORTED",
-            "ARCHGUARD_AGENT_PROVIDER_TIMEOUT": "2s"}},
+            "ARCHGUARD_AGENT_PROVIDER_TIMEOUT": "2s"}, "networks": {"backend": None}},
             "archguard-web": {"ports": [{"host_ip": "127.0.0.1", "target": 8080}]},
             "scanner-runner": {"network_mode": "none"}}, "networks": {"backend": {"internal": True}}}
 
@@ -53,6 +53,16 @@ class ComposeBoundaryTest(unittest.TestCase):
             mutation(model)
             with self.assertRaises(AssertionError):
                 config.verify(model)
+
+    def test_synthetic_and_rollback_reject_platform_network_escape(self):
+        for network_change in ({"networks": {"backend": None, "frontend": None}},
+                               {"networks": {"backend": None, "egress": None}},
+                               {"networks": {}}, {"network_mode": "host"},
+                               {"network_mode": "service:other"}):
+            model = self.model()
+            model["services"]["archguard-platform"].update(network_change)
+            with self.subTest(change=network_change), self.assertRaises(AssertionError):
+                config.verify_networks(model)
 
     def test_rollback_requires_old_images_closed_model_and_readonly_proxy_guard(self):
         model = self.model()

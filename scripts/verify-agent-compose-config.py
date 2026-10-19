@@ -19,6 +19,9 @@ def verify(model):
 
 def verify_networks(model):
     services = model["services"]
+    platform = services["archguard-platform"]
+    assert set(platform.get("networks", {})) == {"backend"}, "Platform network boundary"
+    assert not platform.get("network_mode"), "Platform namespace boundary"
     for name, service in services.items():
         if name != "archguard-web":
             assert not service.get("ports"), f"Internal service exposed: {name}"

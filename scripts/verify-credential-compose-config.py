@@ -8,6 +8,8 @@ import uuid
 def verify(model):
     services = model['services']
     platform = services['archguard-platform']
+    assert set(platform.get('networks', {})) == {'backend'}, 'Platform network boundary'
+    assert not platform.get('network_mode'), 'Platform namespace boundary'
     env = platform['environment']
     assert env['SPRING_PROFILES_ACTIVE'] == 'oidc,local-compose'
     assert env['ARCHGUARD_AGENT_ENABLED'] == env['ARCHGUARD_AGENT_SYNTHETIC_ENABLED'] == 'false'

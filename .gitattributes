@@ -1,2 +1,6 @@
 runner/*.sh text eol=lf
 scripts/*.sh text eol=lf
+netguard/*.sh text eol=lf
+scripts/network-fixtures/curl text eol=lf
+scripts/network-fixtures/java text eol=lf
+scripts/network-fixtures/sleep text eol=lf

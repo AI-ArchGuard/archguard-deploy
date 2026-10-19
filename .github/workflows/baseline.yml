@@ -32,8 +32,7 @@ jobs:
         run: python3 -m unittest discover -s ci -p 'test_*.py'
       - name: Check Compose acceptance harness syntax
         run: |
-          python3 -m py_compile scripts/verify-governance-compose.py scripts/verify-agent-compose.py scripts/verify-agent-rollback.py
-          python3 -m unittest discover -s scripts -p 'test_*.py'
+          python3 -m py_compile scripts/verify-governance-compose.py scripts/verify-agent-compose.py scripts/verify-agent-rollback.py scripts/verify-agent-live-rollback.py scripts/initialize-agent-inventory.py scripts/test-agent-inventory-volume.py scripts/test-agent-network.py scripts/live-compose-fixtures/test_rollback_proxy_http.py
           node --check scripts/verify-personal-login.mjs
 
   compose:
@@ -89,6 +88,66 @@ jobs:
           python3 scripts/verify-credential-compose-config.py .local/credential-compose.json
           jq -e '.services["archguard-platform"].environment.ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED == "false" and .services["archguard-web"].build.args.VITE_CREDENTIAL_UI_ENABLED == "false"' .local/credential-compose.json
           python3 scripts/test-credential-volumes.py
+      - name: Verify default-closed, explicitly bound and closed personal-live models
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ARCHGUARD_SCANNER_CONTEXT=../archguard-scanner
+          export ARCHGUARD_PLATFORM_CONTEXT=../archguard-platform
+          export ARCHGUARD_WEB_CONTEXT=../archguard-web
+          export ARCHGUARD_SOURCES_CONTEXT=../archguard-samples
+          export ARCHGUARD_LOCAL_PORT=8081
+          export ARCHGUARD_CREDENTIAL_OWNER_ID=22222222-2222-4222-8222-222222222222
+          export ARCHGUARD_CREDENTIAL_DEPLOYMENT_ID=33333333-3333-4333-8333-333333333333
+          printf '%s\n' '{"schemaVersion":"0.1.0","officialIpv4":["8.8.8.8"],"postgresIpv4":"172.28.0.2","keycloakIpv4":"172.28.0.3","webIpv4":"172.28.0.4"}' > .local/ci-network.json
+          printf '%s\n' '127.0.0.1 localhost' '172.28.0.2 postgres' '172.28.0.3 keycloak' '8.8.8.8 api.deepseek.com' > .local/ci-platform-hosts
+          export ARCHGUARD_AGENT_NETWORK_CONFIG_FILE="$PWD/.local/ci-network.json"
+          export ARCHGUARD_AGENT_HOSTS_FILE="$PWD/.local/ci-platform-hosts"
+          export ARCHGUARD_AGENT_NETWORK_SHA256="$(sha256sum .local/ci-network.json | cut -d ' ' -f 1)"
+          live=(-p archguard-agent-4h --profile credential-bootstrap -f compose.yaml -f compose.personal-credentials.yaml -f compose.agent-live.yaml --env-file .local/runtime.env)
+          docker compose "${live[@]}" config --format json > .local/live-default.json
+          python3 scripts/verify-agent-live-compose-config.py .local/live-default.json
+          jq -e '.services["archguard-platform"].environment | .ARCHGUARD_AGENT_ENABLED == "false" and .ARCHGUARD_AGENT_LIVE_ENABLED == "false" and .ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED == "false" and .ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED == "false"' .local/live-default.json
+          jq -e '.services["archguard-web"].build.args | .VITE_AGENT_UI_ENABLED == "false" and .VITE_AGENT_LIVE_UI_ENABLED == "false" and .VITE_CREDENTIAL_UI_ENABLED == "false"' .local/live-default.json
+          export ARCHGUARD_AGENT_ENABLED=true ARCHGUARD_AGENT_LIVE_ENABLED=true
+          export ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED=true ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED=true
+          export ARCHGUARD_AGENT_UI_ENABLED=true ARCHGUARD_AGENT_LIVE_UI_ENABLED=true ARCHGUARD_CREDENTIAL_UI_ENABLED=true
+          export ARCHGUARD_AGENT_LIVE_PROJECT_ID=44444444-4444-4444-8444-444444444444
+          export ARCHGUARD_AGENT_LIVE_BATCH_ID=55555555-5555-4555-8555-555555555555
+          export ARCHGUARD_AGENT_LIVE_NETWORK_CHECK_REF=ci-synthetic-network-proof
+          export ARCHGUARD_AGENT_LIVE_SECRET_CHECK_REF=ci-synthetic-secret-proof
+          docker compose "${live[@]}" config --format json > .local/live-bound.json
+          python3 scripts/verify-agent-live-compose-config.py .local/live-bound.json
+          docker compose "${live[@]}" -f compose.agent-live-closed.yaml config --format json > .local/live-closed.json
+          python3 scripts/verify-agent-live-compose-config.py .local/live-closed.json --closed
+      - name: Build scoped fixture images before offline tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag archguard-ci-guard netguard
+          docker build --tag archguard-ci-curl scripts/ci-curl-fixture
+          docker pull nginxinc/nginx-unprivileged:1.29.5-alpine@sha256:42a7d7f2ee23e9f5a1dcdf3647ba5c585bbd18f79e79cd817e70e8cd61c55779
+          guard_image="$(docker image inspect --format '{{.Id}}' archguard-ci-guard)"
+          curl_image="$(docker image inspect --format '{{.Id}}' archguard-ci-curl)"
+          nginx_image="$(docker image inspect --format '{{.Id}}' nginxinc/nginx-unprivileged:1.29.5-alpine@sha256:42a7d7f2ee23e9f5a1dcdf3647ba5c585bbd18f79e79cd817e70e8cd61c55779)"
+          printf 'GUARD_IMAGE=%s\nCURL_IMAGE=%s\nNGINX_IMAGE=%s\n' "$guard_image" "$curl_image" "$nginx_image" >> "$GITHUB_ENV"
+          docker run --rm --pull=never --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges:true --entrypoint apk "$guard_image" info -v
+          docker run --rm --pull=never --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges:true --entrypoint /usr/bin/curl "$curl_image" --version
+          docker run --rm --pull=never --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges:true --entrypoint dpkg-query "$curl_image" --show
+      - name: Run complete Python scripts suite with native POSIX ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Same suite as Windows, container UID0 only; the host runner stays unprivileged.
+          docker run --rm --pull=never --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges:true --user=0:0 --no-healthcheck --pids-limit=128 --memory=256m --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 --env PYTHONDONTWRITEBYTECODE=1 --mount "type=bind,source=$PWD,target=/workspace,readonly" --workdir /workspace --entrypoint python3 "$GUARD_IMAGE" -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Prove isolated namespace, real shell curl and rollback HTTP boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/test-agent-network.py --image "$GUARD_IMAGE" --platform-image "$CURL_IMAGE"
+          python3 scripts/live-compose-fixtures/test_rollback_proxy_http.py --image "$NGINX_IMAGE" --client-image "$GUARD_IMAGE"
+      - name: Prove native new-volume inventory initialization and refusal to overwrite
+        run: python3 scripts/test-agent-inventory-volume.py --image "$GUARD_IMAGE"
 
   windows-startup:
     runs-on: windows-latest
@@ -108,6 +167,16 @@ jobs:
           if ([System.Text.Encoding]::UTF8.GetString($credentialScript).Contains("`r")) {
             throw 'Credential volume script must use LF line endings'
           }
+          $guardWrapper = [System.IO.File]::ReadAllBytes('netguard/platform-start.sh')
+          if ([System.Text.Encoding]::UTF8.GetString($guardWrapper).Contains("`r")) {
+            throw 'Bind-mounted guard startup wrapper must use LF line endings'
+          }
           $parseErrors = $null
           [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/configure-personal-owner.ps1", [ref]$null, [ref]$parseErrors) | Out-Null
           if ($parseErrors.Count) { throw 'Personal owner setup syntax invalid' }
+      - name: Run complete Python scripts suite including native Windows ACL proof
+        shell: pwsh
+        run: |
+          $env:PYTHONDONTWRITEBYTECODE = '1'
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Python scripts suite failed' }

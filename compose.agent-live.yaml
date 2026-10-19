@@ -1,0 +1,87 @@
+# Use only with compose.yaml + compose.personal-credentials.yaml.
+# No switch grants a Project/batch approval. No Key is injected here.
+services:
+  agent-netguard:
+    build:
+      context: ./netguard
+    image: archguard/agent-netguard:personal-live-local
+    user: "0:0"
+    entrypoint: [python3, /opt/archguard/netguard/guard.py]
+    command: [serve]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 64m
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    volumes:
+      - type: bind
+        source: ${ARCHGUARD_AGENT_NETWORK_CONFIG_FILE:?set the reviewed non-secret network JSON file}
+        target: /run/archguard-network/network.json
+        read_only: true
+        bind: {create_host_path: false}
+    networks:
+      backend:
+        aliases: [archguard-platform]
+      agent-egress: {}
+    healthcheck:
+      test: [CMD, python3, /opt/archguard/netguard/guard.py, health]
+      interval: 5s
+      timeout: 2s
+      retries: 1
+    restart: "no"
+
+  archguard-platform:
+    user: "10001:10001"
+    network_mode: service:agent-netguard
+    networks: !reset []
+    entrypoint: [/bin/sh, /opt/archguard/platform-start.sh]
+    command: []
+    restart: "no"
+    environment:
+      SPRING_PROFILES_ACTIVE: oidc,local-compose,agent-live
+      JAVA_TOOL_OPTIONS: -Djdk.httpclient.disableRetryConnect=true
+      ARCHGUARD_AGENT_ENABLED: ${ARCHGUARD_AGENT_ENABLED:-false}
+      ARCHGUARD_AGENT_LIVE_ENABLED: ${ARCHGUARD_AGENT_LIVE_ENABLED:-false}
+      ARCHGUARD_AGENT_SYNTHETIC_ENABLED: "false"
+      ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED: ${ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED:-false}
+      ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_FILE: /run/archguard-inventory/inventory.json
+      ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED: ${ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED:-false}
+      ARCHGUARD_AGENT_NETWORK_SHA256: ${ARCHGUARD_AGENT_NETWORK_SHA256:?set the reviewed network JSON SHA-256}
+      ARCHGUARD_AGENT_LIVE_PROJECT_ID: ${ARCHGUARD_AGENT_LIVE_PROJECT_ID:-}
+      ARCHGUARD_AGENT_LIVE_BATCH_ID: ${ARCHGUARD_AGENT_LIVE_BATCH_ID:-}
+      ARCHGUARD_AGENT_LIVE_NETWORK_CHECK_REF: ${ARCHGUARD_AGENT_LIVE_NETWORK_CHECK_REF:-}
+      ARCHGUARD_AGENT_LIVE_SECRET_CHECK_REF: ${ARCHGUARD_AGENT_LIVE_SECRET_CHECK_REF:-}
+    depends_on:
+      agent-netguard: {condition: service_healthy}
+    volumes:
+      - type: bind
+        source: ${ARCHGUARD_AGENT_HOSTS_FILE:?set the reviewed non-secret Platform hosts file}
+        target: /etc/hosts
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./netguard/platform-start.sh
+        target: /opt/archguard/platform-start.sh
+        read_only: true
+        bind: {create_host_path: false}
+      - type: volume
+        source: agent-live-inventory
+        target: /run/archguard-inventory
+        read_only: true
+
+  archguard-web:
+    build:
+      args:
+        VITE_AGENT_UI_ENABLED: ${ARCHGUARD_AGENT_UI_ENABLED:-false}
+        VITE_AGENT_LIVE_UI_ENABLED: ${ARCHGUARD_AGENT_LIVE_UI_ENABLED:-false}
+        VITE_CREDENTIAL_UI_ENABLED: ${ARCHGUARD_CREDENTIAL_UI_ENABLED:-false}
+
+networks:
+  agent-egress:
+    internal: false
+
+volumes:
+  agent-live-inventory:

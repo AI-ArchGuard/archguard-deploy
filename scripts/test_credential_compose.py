@@ -17,7 +17,7 @@ class CredentialComposeTest(unittest.TestCase):
                    ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED='false', ARCHGUARD_CREDENTIAL_DIRECTORY='/var/lib/archguard/credentials',
                    ARCHGUARD_CREDENTIAL_MASTER_FILE='/run/archguard-master/master.key')
         self.model = {'services': {
-            'archguard-platform': {'environment': env, 'read_only': True, 'cap_drop': ['ALL'], 'volumes': [
+            'archguard-platform': {'environment': env, 'networks': {'backend': None}, 'read_only': True, 'cap_drop': ['ALL'], 'volumes': [
                 {'target': '/var/lib/archguard/credentials', 'source': 'cipher', 'type': 'volume'},
                 {'target': '/run/archguard-master', 'source': 'master', 'type': 'volume', 'read_only': True}]},
             'archguard-web': {'ports': [{'host_ip': '127.0.0.1', 'target': 8080, 'published': '8081'}],
@@ -52,6 +52,16 @@ class CredentialComposeTest(unittest.TestCase):
                 mutate(model)
                 with self.assertRaises(AssertionError):
                     module.verify(model)
+
+    def test_personal_credentials_reject_platform_network_escape(self):
+        for change in ({'networks': {'backend': None, 'frontend': None}},
+                       {'networks': {'backend': None, 'egress': None}},
+                       {'networks': {}}, {'network_mode': 'host'},
+                       {'network_mode': 'service:other'}):
+            model = copy.deepcopy(self.model)
+            model['services']['archguard-platform'].update(change)
+            with self.subTest(change=change), self.assertRaises(AssertionError):
+                module.verify(model)
 
 
 if __name__ == '__main__':
