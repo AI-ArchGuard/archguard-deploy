@@ -220,6 +220,25 @@ class LiveComposeTest(unittest.TestCase):
                 with self.subTest(service=service, capability=capability):
                     self.reject(changed)
 
+    def test_every_controlled_bind_requires_explicit_refusal_to_create_host_path(self):
+        for service, target, closed in (
+                ('agent-netguard', NETWORK, False),
+                ('archguard-platform', '/etc/hosts', False),
+                ('archguard-platform', WRAPPER, False),
+                ('archguard-web', '/etc/nginx/conf.d/default.conf', True)):
+            for mutation in ('create-enabled', 'flag-missing', 'bind-missing'):
+                changed = model(closed=closed)
+                mount = next(item for item in changed['services'][service]['volumes']
+                             if item['target'] == target)
+                if mutation == 'create-enabled':
+                    mount['bind']['create_host_path'] = True
+                elif mutation == 'flag-missing':
+                    mount['bind'].pop('create_host_path')
+                else:
+                    mount.pop('bind')
+                with self.subTest(service=service, target=target, mutation=mutation):
+                    self.reject(changed, closed=closed)
+
     def test_rejects_deploy_restart_policy_even_with_service_restart_no(self):
         # The namespace lifecycle has a single fixed restart binding. Reject
         # any deploy restart-policy representation, including explicit none.

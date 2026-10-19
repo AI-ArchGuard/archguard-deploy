@@ -106,6 +106,30 @@ jobs:
           export ARCHGUARD_AGENT_NETWORK_SHA256="$(sha256sum .local/ci-network.json | cut -d ' ' -f 1)"
           live=(-p archguard-agent-4h --profile credential-bootstrap -f compose.yaml -f compose.personal-credentials.yaml -f compose.agent-live.yaml --env-file .local/runtime.env)
           docker compose "${live[@]}" config --format json > .local/live-default.json
+          docker compose version --short
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          model = json.loads(Path('.local/live-default.json').read_text(encoding='utf-8'))
+          for service, target, label in (
+                  ('agent-netguard', '/run/archguard-network/network.json', 'guard-network'),
+                  ('archguard-platform', '/etc/hosts', 'platform-hosts'),
+                  ('archguard-platform', '/opt/archguard/platform-start.sh', 'platform-wrapper')):
+              mount = next(item for item in model['services'][service]['volumes'] if item['target'] == target)
+              binding = mount.get('bind', {})
+              print(json.dumps({
+                  'mount': label,
+                  'typeIsBind': mount.get('type') == 'bind',
+                  'readOnly': mount.get('read_only') is True,
+                  'sourceIsAbsolute': isinstance(mount.get('source'), str) and Path(mount['source']).is_absolute(),
+                  'bindPresent': 'bind' in mount,
+                  'bindKeys': sorted(binding),
+                  'createHostPathPresent': 'create_host_path' in binding,
+                  'createHostPathIsFalse': binding.get('create_host_path') is False,
+                  'createHostPathIsTrue': binding.get('create_host_path') is True,
+              }, sort_keys=True))
+          PY
           python3 scripts/verify-agent-live-compose-config.py .local/live-default.json
           jq -e '.services["archguard-platform"].environment | .ARCHGUARD_AGENT_ENABLED == "false" and .ARCHGUARD_AGENT_LIVE_ENABLED == "false" and .ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED == "false" and .ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED == "false"' .local/live-default.json
           jq -e '.services["archguard-web"].build.args | .VITE_AGENT_UI_ENABLED == "false" and .VITE_AGENT_LIVE_UI_ENABLED == "false" and .VITE_CREDENTIAL_UI_ENABLED == "false"' .local/live-default.json
@@ -178,5 +202,24 @@ jobs:
         shell: pwsh
         run: |
           $env:PYTHONDONTWRITEBYTECODE = '1'
+          @'
+          import json
+          from pathlib import Path
+          import tempfile
+
+          try:
+              with tempfile.TemporaryDirectory() as temp:
+                  path = Path(temp)
+                  print(json.dumps({
+                      'temporaryPathDiagnosticsAvailable': True,
+                      'temporaryPathIsCanonical': path == path.resolve(strict=True),
+                      'temporaryPathOrAncestorIsReparse': any(
+                          getattr(part.lstat(), 'st_file_attributes', 0) & 0x400 != 0
+                          for part in (path, *path.parents)),
+                  }, sort_keys=True))
+          except OSError:
+              print(json.dumps({'temporaryPathDiagnosticsAvailable': False}, sort_keys=True))
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'Windows temporary path diagnostic failed' }
           python -m unittest discover -s scripts -p 'test_*.py' -v
           if ($LASTEXITCODE -ne 0) { throw 'Windows Python scripts suite failed' }
