@@ -8,6 +8,8 @@
 
 CI 保留已有治理适配器、Compose/凭据卷、Windows 启动/owner 和 LF 检查，增加默认关闭/显式绑定/关闭后的 live 渲染模型。渲染只用合成值，不启动服务或证明真实批准。
 
+live 渲染契约核验版本为 Docker Compose `5.5.1`；不承诺所有 `>=2.24.4` 版本都保留安全字段。2026-10-19 CI 的 `2.38.2` 将三个受控 bind 的显式 `create_host_path: false` 渲染为 `bind: {}`，严格 verifier 因而拒绝，不能把缺失字段解释为 false。CI 仅在本 job 的 `RUNNER_TEMP/archguard-compose` 下载[官方 v5.5.1 Linux x86_64 二进制](https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-linux-x86_64)，先验证 SHA256 `db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed576`，再赋予执行权限并以绝对路径使用；不全局安装或修改 Docker 配置。来源与摘要由操作员从[官方发布](https://github.com/docker/compose/releases/tag/v5.5.1)实际核对（发布时间 2026-09-03）。这是已使用的 Apache-2.0 Compose 工具版本固定，不增加运行依赖；相较自动更新宿主插件或增加安装 Action，独立文件无需改变宿主工具和引入额外 Action 依赖。本机操作同样须核对 `5.5.1`，升级/替代版本须重跑全部模型和字段保留验证。
+
 同一套完整 `scripts/test_*.py` 在 Windows 上覆盖原生 ACL；Linux 在已构建 guard 镜像内以 UID0、cap_drop ALL、只读仓库、network none 和临时 `/tmp` 运行，从而实际覆盖原生 POSIX 所有权/模式。容器 UID0 不要求宿主测试进程以 root 运行。真实本地 socket 是离线测试，不是官方外发。
 
 临时 Docker 网络测试只连接自有合成 TCP peer，覆盖精确 DB/OIDC/Web、官方形状 /32、DNS/UDP/IPv6、错误端口、真实 shell/curl 的代理/curlrc/重定向拒绝、就绪失败、guard crash 与已建立连接撤销。HTTP fixture 使用真实 nginx 回滚代理。镜像先构建/拉取再取得本地不可变 ID，测试本身禁止拉取、活动卷、Secret、宿主 namespace、Docker socket 挂载和真实官方请求。

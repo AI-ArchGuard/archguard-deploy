@@ -6,7 +6,7 @@
 
 **Architecture:** A namespace-local nftables guard owns networking; nonroot Platform admits Java only after loopback configuration readiness. Separate rendered-model and historical-snapshot verifiers retain existing synthetic/credential semantics.
 
-**Tech Stack:** Docker Compose >=2.24.4, existing pinned Alpine-based image, nftables 1.1.5-r2, Python 3.12+ stdlib, POSIX sh, existing PowerShell checks; no SDK/pip/npm dependency.
+**Tech Stack:** Docker Compose 5.5.1 for the verified live render contract (not a blanket >=2.24.4 guarantee), existing pinned Alpine-based image, nftables 1.1.5-r2, Python 3.12+ stdlib, POSIX sh, existing PowerShell checks; no SDK/pip/npm dependency.
 
 **Spec:** `docs/superpowers/specs/2026-10-17-personal-live-deploy-design.md`
 

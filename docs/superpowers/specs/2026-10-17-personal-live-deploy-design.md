@@ -66,6 +66,8 @@ Platform 保持 UID/GID 10001、cap_drop ALL、只读根及原卷，改为 `netw
 
 新增独立 verifier：严格断言最终渲染模型中的守卫权限、namespace、restart、入口 wrapper、网络、无端口/Secret、readonly 路径、固定上下文/镜像、六类默认关闭与 live 开启的具体绑定。保留旧 credential/synthetic verifiers 的历史语义；为它们补充原 Platform backend-only 断言，不能让 base 被静默接外网而旧检查仍过。
 
+live 渲染器契约固定已核验的 Docker Compose `5.5.1`，不以 `>=2.24.4` 推断安全字段保留。2026-10-19 CI 确认 `2.38.2` 输出省略 bind 的显式 `create_host_path: false`；verifier 继续拒绝缺失字段。CI 在专用临时目录使用官方独立 `5.5.1`，核对固定 SHA256 后才 chmod/执行，不全局安装或改变 Docker 配置；来源、Apache-2.0 许可和替代方案见[候选手册](../../agent-personal-live-candidate.md)。后续版本须重新验证渲染契约。
+
 Task3 的来源卷补充采用独立 stdlib 操作员 helper，而非 Compose 自动初始化服务：固定 `/reviewed/inventory.json` → 新空原生卷 `/inventory/inventory.json`，严格复用既有 schema/20条/32768字节/24小时约束，保留人工审查原始字节。UID0、cap_drop ALL、network none，exclusive/nofollow/有界写入/fsync，目录0555/文件0444；已有任何条目（含隐藏文件、目录、链接）一律拒绝，不覆盖、不chmod既有条目、不cleanup/repair/retry。UID10001 只读验证实际 native 权限、无额外条目及字节稳定。仅 Platform 只读挂载该独立非Secret卷，不访问凭据/源码/DB卷；backend 的 deployment/Project/manifest 权威校验不变。root 专属临时卷 fixture 只用已构建 immutable guard ID，按精确返回 ID/卷名和自有标签清理，不操作活动卷。完整原有 Python suite 在 guard 容器UID0/只读源码/networknone/tmpfs运行以实际覆盖POSIX所有权，不用跳过或放松断言绕过；Windows仍运行同一完整suite与原生ACL回归。
 
 新 `compose.agent-live-closed.yaml` 明确覆盖所有调用/来源/管理/UI 开关为 false，使用拒绝全部 `/api/v1/agent/` 及项目 agent/documents 的回滚代理。guard close 为独立必做步骤，不能仅凭 YAML 值声称内核出口已关闭。代理返回稳定 503/no-store/traceId，扫描/门禁/OIDC 继续工作。

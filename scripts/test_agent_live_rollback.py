@@ -336,7 +336,9 @@ class FinalHistoryContractTest(unittest.TestCase):
         self.assertEqual(rollback.MANIFEST_FILE, rollback.PRIVATE_DIR / "candidate.json")
         self.assertEqual(rollback.SNAPSHOT_FILE, rollback.PRIVATE_DIR / "rollback-history.json")
         with tempfile.TemporaryDirectory() as temp:
-            private = Path(temp)
+            # Hosted Windows TEMP may use a short-name alias. Supply a real
+            # canonical fixture while retaining the production no-links rule.
+            private = Path(temp).resolve(strict=True)
             candidate = private / "candidate.json"
             capture = private / "rollback-history.json"
             candidate.write_text(json.dumps(manifest()), encoding="utf-8")

@@ -40,6 +40,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prepare verified standalone Compose renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose_dir="$RUNNER_TEMP/archguard-compose"
+          mkdir -p "$compose_dir"
+          compose_binary="$compose_dir/docker-compose"
+          curl --disable --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
+            --output "$compose_binary" https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-linux-x86_64
+          printf '%s  %s\n' db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed576 "$compose_binary" | sha256sum --check --strict
+          chmod 0700 "$compose_binary"
+          "$compose_binary" version --short
+          printf 'ARCHGUARD_COMPOSE=%s\n' "$compose_binary" >> "$GITHUB_ENV"
       - name: Verify Compose model and tmpfs boundaries
         shell: bash
         run: |
@@ -50,8 +63,8 @@ jobs:
             'ARCHGUARD_LOCAL_KEYCLOAK_ADMIN_PASSWORD=compose-validation-only' \
             'ARCHGUARD_GITHUB_WEBHOOK_SECRET=compose-validation-only' \
             > .local/runtime.env
-          docker compose --env-file .local/runtime.env config --quiet
-          docker compose --env-file .local/runtime.env config --format json > .local/compose.json
+          "$ARCHGUARD_COMPOSE" --env-file .local/runtime.env config --quiet
+          "$ARCHGUARD_COMPOSE" --env-file .local/runtime.env config --format json > .local/compose.json
           jq -e '.services.postgres.image == "postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2"' .local/compose.json
           jq -e '.services.keycloak.image == "quay.io/keycloak/keycloak:26.5.3@sha256:5a236ae4dd8ece77490115bace15a11a4d15e9cbcf58a490b95a7da2cd71d32a"' .local/compose.json
           jq -e '.services["archguard-platform"].tmpfs == ["/tmp:rw,noexec,nosuid,size=64m"]' .local/compose.json
@@ -70,11 +83,11 @@ jobs:
           export ARCHGUARD_PLATFORM_CONTEXT=../archguard-platform
           export ARCHGUARD_WEB_CONTEXT=../archguard-web
           export ARCHGUARD_SOURCES_CONTEXT=../archguard-samples
-          docker compose -f compose.yaml -f compose.agent-synthetic.yaml --env-file .local/runtime.env config --format json > .local/agent-compose.json
+          "$ARCHGUARD_COMPOSE" -f compose.yaml -f compose.agent-synthetic.yaml --env-file .local/runtime.env config --format json > .local/agent-compose.json
           python3 scripts/verify-agent-compose-config.py .local/agent-compose.json
           export ARCHGUARD_ROLLBACK_NGINX_CONFIG="$PWD/rollback/web.nginx.conf"
-          docker compose -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-entry-closed.yaml --env-file .local/runtime.env config --quiet
-          docker compose -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-rollback.yaml --env-file .local/runtime.env config --format json > .local/rollback-compose.json
+          "$ARCHGUARD_COMPOSE" -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-entry-closed.yaml --env-file .local/runtime.env config --quiet
+          "$ARCHGUARD_COMPOSE" -f compose.yaml -f compose.agent-synthetic.yaml -f compose.agent-rollback.yaml --env-file .local/runtime.env config --format json > .local/rollback-compose.json
           python3 scripts/verify-agent-compose-config.py .local/rollback-compose.json --rollback
       - name: Verify isolated personal credential configuration and volumes
         shell: bash
@@ -84,7 +97,7 @@ jobs:
           export ARCHGUARD_WEB_CONTEXT=../archguard-web
           export ARCHGUARD_CREDENTIAL_OWNER_ID=22222222-2222-4222-8222-222222222222
           export ARCHGUARD_CREDENTIAL_DEPLOYMENT_ID=33333333-3333-4333-8333-333333333333
-          docker compose --profile credential-bootstrap -f compose.yaml -f compose.personal-credentials.yaml --env-file .local/runtime.env config --format json > .local/credential-compose.json
+          "$ARCHGUARD_COMPOSE" --profile credential-bootstrap -f compose.yaml -f compose.personal-credentials.yaml --env-file .local/runtime.env config --format json > .local/credential-compose.json
           python3 scripts/verify-credential-compose-config.py .local/credential-compose.json
           jq -e '.services["archguard-platform"].environment.ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED == "false" and .services["archguard-web"].build.args.VITE_CREDENTIAL_UI_ENABLED == "false"' .local/credential-compose.json
           python3 scripts/test-credential-volumes.py
@@ -105,8 +118,8 @@ jobs:
           export ARCHGUARD_AGENT_HOSTS_FILE="$PWD/.local/ci-platform-hosts"
           export ARCHGUARD_AGENT_NETWORK_SHA256="$(sha256sum .local/ci-network.json | cut -d ' ' -f 1)"
           live=(-p archguard-agent-4h --profile credential-bootstrap -f compose.yaml -f compose.personal-credentials.yaml -f compose.agent-live.yaml --env-file .local/runtime.env)
-          docker compose "${live[@]}" config --format json > .local/live-default.json
-          docker compose version --short
+          "$ARCHGUARD_COMPOSE" "${live[@]}" config --format json > .local/live-default.json
+          "$ARCHGUARD_COMPOSE" version --short
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -140,9 +153,9 @@ jobs:
           export ARCHGUARD_AGENT_LIVE_BATCH_ID=55555555-5555-4555-8555-555555555555
           export ARCHGUARD_AGENT_LIVE_NETWORK_CHECK_REF=ci-synthetic-network-proof
           export ARCHGUARD_AGENT_LIVE_SECRET_CHECK_REF=ci-synthetic-secret-proof
-          docker compose "${live[@]}" config --format json > .local/live-bound.json
+          "$ARCHGUARD_COMPOSE" "${live[@]}" config --format json > .local/live-bound.json
           python3 scripts/verify-agent-live-compose-config.py .local/live-bound.json
-          docker compose "${live[@]}" -f compose.agent-live-closed.yaml config --format json > .local/live-closed.json
+          "$ARCHGUARD_COMPOSE" "${live[@]}" -f compose.agent-live-closed.yaml config --format json > .local/live-closed.json
           python3 scripts/verify-agent-live-compose-config.py .local/live-closed.json --closed
       - name: Build scoped fixture images before offline tests
         shell: bash
