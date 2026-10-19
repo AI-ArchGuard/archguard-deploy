@@ -1,0 +1,22 @@
+# Application closure only. Explicit guard close is a separate operator action.
+# Keep project name, deployment UUID and every existing volume unchanged.
+services:
+  archguard-platform:
+    environment:
+      ARCHGUARD_AGENT_ENABLED: "false"
+      ARCHGUARD_AGENT_LIVE_ENABLED: "false"
+      ARCHGUARD_AGENT_SYNTHETIC_ENABLED: "false"
+      ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED: "false"
+      ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED: "false"
+  archguard-web:
+    build:
+      args:
+        VITE_AGENT_UI_ENABLED: "false"
+        VITE_AGENT_LIVE_UI_ENABLED: "false"
+        VITE_CREDENTIAL_UI_ENABLED: "false"
+    volumes:
+      - type: bind
+        source: ./rollback/web.nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind: {create_host_path: false}

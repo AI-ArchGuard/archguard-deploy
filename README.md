@@ -18,6 +18,10 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 [个人只写凭据托管](docs/personal-credential-runtime.md)提供独立、默认关闭的 Web/后端管理入口、专用 OIDC owner、分离的主密钥/密文卷与本机配置测试。仅个人环回部署；不使用聊天 Key，不启用真实模型或提前关闭阶段。
 
+[个人 Agent 受限出口候选](docs/agent-personal-live-candidate.md)与[固定兼容矩阵](compatibility/agent-personal-live.md)增加独立 namespace 守卫、默认关闭 Compose、受控 inventory 原生空卷初始化，以及保留全部 21 表历史的私有只读回滚校验。CI 使用临时合成网络/卷与真实 shell/curl/nginx；不访问活动 Secret 或模型。实际两次授权运行、费用/引用核对、最终回滚和阶段关闭仍须在全部 main CI 后另行执行。
+
+个人 live 渲染契约核验版本为 Docker Compose `5.5.1`；CI 使用先核对官方 SHA256 的独立二进制。其他版本须另行证明能保留显式 `create_host_path: false`，详情见候选手册。
+
 - 提供本地 Docker Compose、CI/Staging/Production 部署方案和健康检查。
 - 记录各仓库可部署版本的兼容矩阵、发布顺序和回滚步骤。
 - 管理可观测配置、资源限制、备份恢复与演练脚本。

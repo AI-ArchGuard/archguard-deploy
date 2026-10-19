@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Personal live candidate gate
+
+- Add a default-closed, shared-namespace guard with precise IPv4 peers, bounded readiness and explicit official-flow revocation; preserve credential volumes, deployment identity and V1–V16 history.
+- Add fixed-path native inventory initialization for an explicitly new empty dedicated volume, with read-only nonroot verification and refusal to overwrite or repair existing entries.
+- Add a private final 21-table full-row SHA256 verifier, exact Flyway metadata checks and UUID-bound audit preservation with narrowly approved non-Agent appends only.
+- Integrate controlled Compose renders, the complete Windows/POSIX suite, real synthetic network/shell/curl/nginx and native-volume CI checks; pin official test image bases and record package/license/rebuild limits.
+- Document actual source candidates, artifact/build-flag differences, shutdown/rollback privacy and remaining live gates. No runtime activation, model/account request, Release, unique acceptance report or stage closure is performed by this implementation.
+
 ## Unreleased — Personal credential runtime
 
 - Add default-off personal credential Compose wiring, a dedicated OIDC owner with private initial-password record and authoritative server UUID.
