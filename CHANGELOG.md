@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Safe diagnostics candidate binding
+
+- Replace only the exact Platform candidate pin with merged PR #65/main `af821fc` (main CI `39413909045`); retain the other source pins, public contracts, protocol, quotas and V1–V16 migrations.
+- Test acceptance of the diagnostics tuple and rejection of the prior `903ddc5` tuple even when its manifest and snapshot agree; preserve the strict 21-table/history and ACL checks.
+- Keep the failed batch revoked and its UNKNOWN charge/reservation historical. No root-cause claim, fresh model-call/expense authority, runtime activation, final rollback acceptance, release or stage closure follows from this source-only update.
+
 ## Unreleased — Approved 1017 candidate pins
 
 - Explicitly pin merged Docs `077a7c5`, Platform `903ddc5` and Web `5c5a7a0` for the approved `0.4.0` / `DeepSeek-V4.1-Flash-1017` provider/consumer pairing; record exact SHAs and successful source main CI in the compatibility matrix.
