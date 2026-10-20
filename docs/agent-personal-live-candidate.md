@@ -4,6 +4,8 @@
 
 固定源码、制品差异和回滚顺序见[兼容矩阵](../compatibility/agent-personal-live.md)。历史[九表合成演练](agent-rollback-rehearsal.md)保持原语义；这里新增的 21 表最终校验不能用旧报告替代。Scanner Result/Rules Schema、确定性 Findings、门禁与退出码保持不变，不启用 Gateway/Evals。
 
+当前 Platform 精确候选已更新为 PR #65 的 `af821fc99553d462a2176cba5af70be7cc960c75`（main CI `39413909045` 成功），替代 `903ddc5987e0f6e63091ee4897d4311b9c41cbe9`；只增加固定脱敏拒绝分类，不改变协议、校验、费用策略或迁移。首次真实批次在解释失败后已停止并撤销，费用 `UNKNOWN`、原预留及历史保留；丢弃的响应无法追认根因。后续两次请求流程仅是操作规程，新批次仍须取得新的明确调用/费用批准，不复用旧批次未发送的摘要许可。关闭状态恢复不是该最终回滚流程的运行证据。
+
 ## 工程验证边界
 
 CI 保留已有治理适配器、Compose/凭据卷、Windows 启动/owner 和 LF 检查，增加默认关闭/显式绑定/关闭后的 live 渲染模型。渲染只用合成值，不启动服务或证明真实批准。
@@ -73,7 +75,7 @@ docker compose @live --profile credential-bootstrap config --format json |
 
 任何创建/替换 namespace 都先停止 Platform，再创建 guard、等同 namespace readiness 摘要匹配后重建/启动 Platform。不得先启动 Java、依赖自动 restart 或把存活健康检查当作自动停机。`guard.py close` 只能撤销官方集合，没有自动 reopen；需要开启官方集合时必须用新审查配置按同样顺序替换 namespace。所有服务地址变化均须重新审查。
 
-在明确绑定新 Project/batch/inventory/current credential/refs、24 小时来源证明和原两次条件授权后，才显式打开所需开关和官方集合：串行解释一次 → 成功且结算 → 摘要一次。任何一步失败、UNKNOWN、超阈值、引用/审计异常都停止，不补次数。核对真实 usage/费用/引用、保留原 PASS/FAIL 和退出码；不通过额外模型请求“测试连接”。
+在重新取得明确的两次调用/费用批准，并绑定新 Project/batch/inventory/current credential/refs、24 小时来源证明后，才显式打开所需开关和官方集合：串行解释一次 → 成功且结算 → 摘要一次。任何一步失败、UNKNOWN、超阈值、引用/审计异常都停止，不补次数。核对真实 usage/费用/引用、保留原 PASS/FAIL 和退出码；不通过额外模型请求“测试连接”。
 
 ## 最终关闭、私有 capture、旧应用与恢复
 
@@ -116,4 +118,4 @@ capture 仅在没有 QUEUED/RUNNING 时执行，固定 `archguard-agent-4h-postg
 
 ## 仍未执行的运行与关闭关卡
 
-本工程不证明活动栈受限接通、两次真实 usage/费用/引用、最终 21 表实际回滚恢复、凭据卷实际保留、数据库/身份灾备或正式发布。临时 ACL/SQL/网络/原生卷测试也不替代这些结果。全部工程及 main CI 后才执行原授权的运行关卡，再核对固定制品矩阵、唯一 Docs 阶段报告和所有 main CI，最后关闭 Issue。没有新 Release、唯一验收报告或提前阶段关闭。
+本工程不证明活动栈受限接通、两次真实 usage/费用/引用、最终 21 表实际回滚恢复、凭据卷实际保留、数据库/身份灾备或正式发布。临时 ACL/SQL/网络/原生卷测试也不替代这些结果。全部工程及 main CI 后，仍须取得新的具体调用/费用批准并通过运行绑定才执行真实关卡，再核对固定制品矩阵、唯一 Docs 阶段报告和所有 main CI，最后关闭 Issue。没有新 Release、唯一验收报告或提前阶段关闭。

@@ -96,7 +96,7 @@ def manifest():
             "deploymentId": "44444444-4444-4444-8444-444444444444",
             "candidates": {
                 "docs": "077a7c5afa12557543ee04e14321701c3537931a",
-                "platform": "903ddc5987e0f6e63091ee4897d4311b9c41cbe9",
+                "platform": "af821fc99553d462a2176cba5af70be7cc960c75",
                 "web": "5c5a7a021210876cda55850d7898e11aa52781aa",
                 "scanner": "d4b8e98bfdabbc78f65910ed37e3062167d04b07",
                 "samples": "a53a5bbea2630aac2135aa217d961cdbb77851a3",
@@ -260,6 +260,24 @@ class FinalHistoryContractTest(unittest.TestCase):
     def test_manifest_accepts_exact_approved_1017_candidate_tuple(self):
         # Canonical merge SHAs are independent literals, never production CANDIDATES.
         rollback.validate_manifest(manifest())
+
+    def test_manifest_and_snapshot_accept_exact_diagnostics_platform_candidate(self):
+        candidate = manifest()
+        candidate["candidates"]["platform"] = "af821fc99553d462a2176cba5af70be7cc960c75"
+        snapshot = {"schemaVersion": "0.1.0", "kind": "PERSONAL_LIVE_FINAL_ROLLBACK",
+                    "manifest": copy.deepcopy(candidate), "database": self.parse()}
+        rollback.validate_manifest(candidate)
+        rollback.validate_snapshot(snapshot, candidate)
+
+    def test_manifest_and_snapshot_reject_previous_1017_platform_even_when_consistent(self):
+        candidate = manifest()
+        candidate["candidates"]["platform"] = "903ddc5987e0f6e63091ee4897d4311b9c41cbe9"
+        snapshot = {"schemaVersion": "0.1.0", "kind": "PERSONAL_LIVE_FINAL_ROLLBACK",
+                    "manifest": copy.deepcopy(candidate), "database": self.parse()}
+        with self.assertRaises(AssertionError):
+            rollback.validate_manifest(candidate)
+        with self.assertRaises(AssertionError):
+            rollback.validate_snapshot(snapshot, candidate)
 
     def test_manifest_rejects_old_engineering_tuple_with_other_fields_valid(self):
         candidate = manifest()
