@@ -1,7 +1,7 @@
 """Offline tests for a fixed-path, new-volume-only inventory initializer."""
 import contextlib
 import copy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import importlib.util
 import io
 import json
@@ -36,6 +36,14 @@ def encoded(value=None):
     return json.dumps(fixture() if value is None else value, separators=(",", ":")).encode("utf-8")
 
 
+def new_generation():
+    value = fixture()
+    value['entries'][0].update(inventoryId='44444444-4444-4444-8444-444444444444',
+                              reviewRef='synthetic-review-new', reviewedAt='2026-10-19T12:00:00Z',
+                              expiresAt='2026-10-20T12:00:00Z')
+    return value
+
+
 class InventoryContentContractTest(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(inventory, "RED: fixed-path inventory initializer is not implemented")
@@ -47,6 +55,18 @@ class InventoryContentContractTest(unittest.TestCase):
         self.assertEqual(inventory.REVIEW_FILE, Path("/reviewed/inventory.json"))
         self.assertEqual(inventory.VOLUME_DIR, Path("/inventory"))
         self.assertEqual(inventory.DESTINATION, Path("/inventory/inventory.json"))
+
+    def test_independent_current_generation_does_not_extend_expired_archive_or_accept_appended_entry(self):
+        old = encoded()
+        current = new_generation()
+        later = NOW + timedelta(days=1)
+        self.assertEqual(inventory.validate_inventory(encoded(current), later), current)
+        with self.assertRaises(AssertionError):
+            inventory.validate_inventory(old, later)
+        current['entries'].append(fixture()['entries'][0])
+        with self.assertRaises(AssertionError):
+            inventory.validate_inventory(encoded(current), later)
+        self.assertEqual(old, encoded())
 
     def test_json_utf8_bounds_duplicates_and_unknown_fields_fail_closed(self):
         raw = encoded()
@@ -161,6 +181,44 @@ class InventoryFilesystemContractTest(unittest.TestCase):
         self.assertEqual(list(self.volume.iterdir()), [self.destination])
         inventory.verify(now=NOW)
         self.assertEqual(self.source.read_bytes(), original)
+
+    def test_only_independent_new_empty_directory_initializes_while_expired_archive_is_unchanged(self):
+        inventory.initialize(now=NOW)
+        old_bytes = self.destination.read_bytes()
+        old_modes = (self.volume.stat().st_mode, self.destination.stat().st_mode)
+        later = NOW + timedelta(days=1)
+        with self.assertRaises(AssertionError):
+            inventory.verify(now=later)
+        new_volume = self.root / 'new-volume'
+        new_volume.mkdir(mode=0o755)
+        self.addCleanup(new_volume.chmod, 0o755)
+        self.source.write_bytes(encoded(new_generation()))
+        with mock.patch.multiple(inventory, VOLUME_DIR=new_volume, DESTINATION=new_volume / 'inventory.json'):
+            inventory.initialize(now=later)
+            inventory.verify(now=later)
+        with self.assertRaises(AssertionError):
+            inventory.initialize(now=later)
+        self.assertEqual(self.destination.read_bytes(), old_bytes)
+        self.assertEqual((self.volume.stat().st_mode, self.destination.stat().st_mode), old_modes)
+        self.assertEqual((new_volume / 'inventory.json').read_bytes(), encoded(new_generation()))
+
+    def test_partial_failure_refuses_retry_without_repairing_remaining_bytes_or_modes(self):
+        original_write = os.write
+        calls = 0
+        def fail_after_partial(fd, data):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return original_write(fd, data[:17])
+            raise OSError(PRIVATE)
+        with mock.patch.object(inventory.os, 'write', side_effect=fail_after_partial):
+            with self.assertRaises(AssertionError):
+                inventory.initialize(now=NOW)
+        before = (self.destination.read_bytes(), self.destination.stat().st_mode, self.volume.stat().st_mode)
+        self.assertEqual(before[0], encoded()[:17])
+        with self.assertRaises(AssertionError):
+            inventory.initialize(now=NOW)
+        self.assertEqual((self.destination.read_bytes(), self.destination.stat().st_mode, self.volume.stat().st_mode), before)
 
     def test_any_existing_entry_including_dotfile_directory_and_link_refuses_without_mutation(self):
         for kind in ("file", "dotfile", "directory", "symlink"):

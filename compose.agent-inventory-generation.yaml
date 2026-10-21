@@ -1,0 +1,5 @@
+# Explicit opt-in only; validate the canonical nonzero UUID with the verifier.
+# COMPOSE_PROJECT_NAME is resolved by Compose from the actual project (-p).
+volumes:
+  agent-live-inventory:
+    name: ${COMPOSE_PROJECT_NAME:?set the actual Compose project}_agent-live-inventory-${ARCHGUARD_AGENT_INVENTORY_GENERATION:?set the reviewed canonical nonzero inventory UUID}
