@@ -113,6 +113,7 @@ def _verify(model, *, closed, inventory_generation):
         require(not network.get('external') and not network.get('enable_ipv6'), 'network boundary')
         require(network.get('driver', 'bridge') == 'bridge', 'network boundary')
     for name, service in services.items():
+        require(not service.get('volumes_from'), 'mount boundary')
         require(not service.get('privileged'), 'privilege boundary')
         require(service.get('pid') != 'host' and service.get('ipc') != 'host' and
                 service.get('cgroup') != 'host', 'namespace boundary')
@@ -153,7 +154,6 @@ def _verify(model, *, closed, inventory_generation):
         require(not service.get('secrets') and not service.get('configs'), 'secret boundary')
         for key in ('extra_hosts', 'dns', 'dns_search', 'dns_opt', 'links', 'external_links'):
             require(not service.get(key), 'resolver boundary')
-        require(not service.get('volumes_from'), 'mount boundary')
     require(not platform.get('cap_add') and guard.get('cap_add') == ['NET_ADMIN'], 'capability boundary')
     require(platform.get('entrypoint') == ['/bin/sh', WRAPPER] and
             platform.get('command') in (None, []), 'startup boundary')

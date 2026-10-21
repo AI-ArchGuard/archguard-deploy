@@ -150,6 +150,24 @@ class LiveComposeTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.verifier.verify(model(), inventory_generation=GENERATION)
 
+    def test_all_services_reject_inherited_mounts_in_legacy_generation_and_closed_models(self):
+        # Inheritance can expose inventory and credentials without adding any
+        # explicit volumes, including through an external container reference.
+        for generation in (None, GENERATION):
+            for closed in (False, True):
+                original = self.generation_model(closed=closed) if generation else model(closed=closed)
+                self.verifier.verify(original, closed=closed, inventory_generation=generation)
+                for service in original['services']:
+                    for inherited in ('archguard-platform:ro', 'archguard-platform:rw',
+                                      'container:synthetic-sensitive-sentinel:ro'):
+                        changed = copy.deepcopy(original)
+                        changed['services'][service]['volumes_from'] = [inherited]
+                        with self.subTest(generation=generation, closed=closed, service=service,
+                                          inherited=inherited):
+                            with self.assertRaises(AssertionError) as rejected:
+                                self.verifier.verify(changed, closed=closed, inventory_generation=generation)
+                            self.assertEqual(str(rejected.exception), 'mount boundary')
+
     def test_generation_rejects_invalid_identity_physical_alias_and_mount_escapes(self):
         for generation in ('', 'bad', GENERATION.upper(), GENERATION.replace('-', ''),
                            '{' + GENERATION + '}', '00000000-0000-0000-0000-000000000000', 1, True):
