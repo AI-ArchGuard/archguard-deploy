@@ -5,7 +5,7 @@
 ## 固定来源与实际制品
 
 - Docs：`077a7c5afa12557543ee04e14321701c3537931a`；main CI `39144567175` 成功。ADR-0015 仅更新获批 `DeepSeek-V4.1-Flash-1017` 映射，保留 ADR-0012/0013/0014 原协议、费用和调用次数；实际前仍重核官方协议/映射/价格。
-- Platform：`af821fc99553d462a2176cba5af70be7cc960c75`；诊断增量 PR #65 已合并，main CI `39413909045` 成功。替代原 `903ddc5987e0f6e63091ee4897d4311b9c41cbe9`，只新增固定脱敏拒绝分类，不放宽输出、引用或用量校验。Maven 仍 `0.4.0`；Settings/ack 契约 `0.4.0` 明确配对 1017，Batch `0.3.0`、live API/输出 `0.1.0`。主 Flyway V1–V8、Agent baseline8 + V9–V16 不变。当前 JAR 来源 SHA、构建字节及正常 Flyway validate/迁移资源 SHA 必须另外核对。
+- Platform：`8b547faacd7a7b09992006f677467fffc7b08919`，tree `07bf49de3552741ae9b005c458f391e25f233685`；main CI `39565721127` 成功，Linux 919 项、0失败/错误/跳过及 Docker build。此实际合并包含 PR #66 的获批四字段有界元数据兼容（中间合并 `c461f6be3cac6f226750d64cdb877f412a5b9bb4`）和 PR #67 的 tests-only 来源/历史回归，替代原诊断候选 `af821fc99553d462a2176cba5af70be7cc960c75`。verifier 仅接受实际新合并 SHA，拒绝旧诊断、中间合并及等树本地 `dfb1f9541323b80ee46eb527e333e5f27b279be9`；等树不是提交身份。Maven 仍 `0.4.0`；Settings/ack `0.4.0` 配对 1017，Batch `0.3.0`、live API/业务输出 `0.1.0`、Web 消费契约不变。主 Flyway V1–V8、Agent baseline8 + V9–V16 不变。源码/CI 不证明活动制品；当前 JAR 来源 SHA、构建字节及正常 Flyway validate/迁移资源 SHA 必须另外核对。
 - Web：`5c5a7a021210876cda55850d7898e11aa52781aa`；PR #16 已合并，main CI `39220944637` 成功。package 仍 `0.2.0`；消费 Platform 生成契约，仅提交当前 `0.4.0` 显式确认。默认 Release tarball 三类 Agent/live/credential UI 关闭；显式 8081 Docker 构建与默认 tarball 字节/参数不同。只有实际核验的构建参数与产物才能证明入口状态，tag 或 package 版本不够。
 - Scanner：`d4b8e98bfdabbc78f65910ed37e3062167d04b07`，既有 `0.2.1` 兼容线；Result/Rules Schema `0.1.0`、CLI `0/2/64/70` 不变。
 - Samples：`a53a5bbea2630aac2135aa217d961cdbb77851a3`；受控合成 fixture，无客户源码。
@@ -14,7 +14,7 @@
 
 Platform 原业务 Dockerfile runtime `eclipse-temurin:21-jre-jammy` + apt curl、Web 业务 runtime `nginxinc/nginx-unprivileged:1.29.5-alpine` 不是本变更新增的完整业务供应链锁。保留这项限制，记录实际业务 image/JAR/Web 字节；本任务不修改它们或宣称发布。
 
-该组合仅更新映射确认与候选绑定：请求别名和单元素响应白名单仍为 `deepseek-flash`，固定 `/responses`、非流式、无工具/会话/重试，原 `reasoning.effort=none`、`tool_choice=none`、`store=false` 不变。上下文价格版本仍为 `deepseek-flash-context-peak-usd-2026-10-15`，每请求预留 `316373` microUSD，单次/两次 USD `0.35/0.70`，完整请求 6000 UTF-8 字节、输出 1500 Token、输入 8000 调用后观察阈值及日限额均不变。旧确认可读、撤销和按自身绑定结算，但不得静默升级或用于新真实发送。
+该来源增量仅纳入已批准的有界响应元数据兼容及回归：`user/max_tool_calls` 只允许缺省/null，`top_logprobs` 只允许缺省/null/整数0，`completed_at` 非空时为 `0..253402300799` 的整数秒且有同界整数 `created_at`、完成不早于创建；缺省/null完成不新增创建要求。其他未知字段、业务 Schema、引用和可信用量边界不变，不声称修复已验证的真实故障。请求投影不增加字段；请求别名和单元素响应白名单仍为 `deepseek-flash`，固定 `/responses`、非流式、无工具/会话/重试，`reasoning.effort=none`、`tool_choice=none`、`store=false` 不变。上下文价格版本仍为 `deepseek-flash-context-peak-usd-2026-10-15`，每请求预留 `316373` microUSD，单次/两次 USD `0.35/0.70`，完整请求 6000 UTF-8 字节、输出 1500 Token、输入 8000 调用后观察阈值及日限额均不变。旧确认可读、撤销和按自身绑定结算，但不得静默升级或用于新真实发送。实际模型/价格/协议仍须在未来获批调用前重新核对；本次来源绑定不代表该核对已执行。
 
 首次真实批次已在解释 `OUTPUT_INVALID` 后停止并撤销；实际费用仍为 `UNKNOWN`，原预留和历史保留，未发送摘要。原始响应已丢弃，不能用新增诊断追认根因，也不能把关闭状态恢复当作真实验收或最终回滚通过。新批次须重新取得具体调用与费用批准，未使用的旧摘要许可不得复用；本候选同步不授予这些权限。
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Bounded response metadata candidate binding
+
+- Bind only the exact Platform source to merged main `8b547fa` (main CI `39565721127`): owner-approved PR #66 inert root-metadata compatibility plus PR #67 tests-only inventory/history regression. Keep the other source pins, public contracts, protocol, model mapping, prices and V1–V16 migrations.
+- Validate manifest and snapshot acceptance of the actual merge; reject former diagnostics `af821fc`, intermediate metadata `c461f6b` and equal-tree local `dfb1f95` even when manifest/snapshot agree. Retain all older-tuple,21-table/history and ACL assertions.
+- Preserve stopped/revoked/UNKNOWN history and24h proof limits. Source/CI readiness neither diagnoses discarded historical responses nor authorizes actual volume selection, deployment, new calls/fees, final rollback acceptance, release or stage closure.
+
 ## Unreleased — Safe diagnostics candidate binding
 
 - Replace only the exact Platform candidate pin with merged PR #65/main `af821fc` (main CI `39413909045`); retain the other source pins, public contracts, protocol, quotas and V1–V16 migrations.
