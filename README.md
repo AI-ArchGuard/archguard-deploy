@@ -22,6 +22,8 @@ ArchGuard 的本地、测试和生产部署、兼容矩阵及可观测配置仓�
 
 个人 live 渲染契约核验版本为 Docker Compose `5.5.1`；CI 使用先核对官方 SHA256 的独立二进制。其他版本须另行证明能保留显式 `create_host_path: false`，详情见候选手册。
 
+[来源证明显式选代设计](docs/agent-inventory-generation-design.md)提供可选 `compose.agent-inventory-generation.yaml`：必填规范非零 `ARCHGUARD_AGENT_INVENTORY_GENERATION`，物理卷为 `<实际 Compose project>_agent-live-inventory-<UUID>`；校验必须显式加 `--inventory-generation UUID`，关闭配置同时加 `--closed`。不加覆盖层仍使用原 legacy 卷。这里只实现离线配置/CI；实际选代须另获批准、关闭全部出口/入口、停止 Platform、证明 pending=0 并保留旧卷及21表历史。新证明最多24小时有效，不恢复旧批次或授予模型调用/费用许可；完整门槛见候选手册。
+
 当前候选显式固定已合并且 main CI 成功的 Docs ADR-0015、Platform Settings/ack `0.4.0`、PR #65 脱敏诊断增量与 Web 消费契约，匹配获批 `DeepSeek-V4.1-Flash-1017`；精确 SHA、CI 和兼容版本见固定矩阵。回滚 verifier 仅接受该新组合，旧 10-15 及原 `903ddc5` 工程组合不再是当前候选。请求/响应别名仍仅 `deepseek-flash`，原协议、价格及费用上限不变；Deploy 合并 SHA 仍须合并后填入私有 manifest。首次真实解释失败后原批次已停止并撤销，费用仍 `UNKNOWN`；新调用须重新取得具体调用和费用批准，不复用旧摘要许可。诊断版本和关闭状态恢复均不证明真实验收或最终回滚通过。
 
 - 提供本地 Docker Compose、CI/Staging/Production 部署方案和健康检查。

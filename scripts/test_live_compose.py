@@ -5,7 +5,11 @@ the actual nginx artifact, without reading an active Compose env file.
 """
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 
@@ -16,6 +20,8 @@ NETWORK = '/run/archguard-network/network.json'
 INVENTORY = '/run/archguard-inventory/inventory.json'
 WRAPPER = '/opt/archguard/platform-start.sh'
 BINDINGS = ('PROJECT_ID', 'BATCH_ID', 'NETWORK_CHECK_REF', 'SECRET_CHECK_REF')
+GENERATION = 'abcdef12-2222-4222-8222-222222222222'
+PROJECT = 'archguard-generation-test'
 FLAGS = ('ARCHGUARD_AGENT_ENABLED', 'ARCHGUARD_AGENT_LIVE_ENABLED',
          'ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED', 'ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED')
 WEB_FLAGS = ('VITE_AGENT_UI_ENABLED', 'VITE_AGENT_LIVE_UI_ENABLED', 'VITE_CREDENTIAL_UI_ENABLED')
@@ -128,6 +134,97 @@ class LiveComposeTest(unittest.TestCase):
         self.verifier.verify(model())
         self.verifier.verify(model(enabled=True))
         self.verifier.verify(model(closed=True), closed=True)
+
+    def generation_model(self, **kwargs):
+        value = model(**kwargs)
+        value['name'] = PROJECT
+        value['volumes']['agent-live-inventory']['name'] = PROJECT + '_agent-live-inventory-' + GENERATION
+        return value
+
+    def test_generation_requires_explicit_opt_in_and_accepts_closed_or_bound_models(self):
+        for kwargs in ({}, {'closed': True}, {'enabled': True}):
+            with self.subTest(**kwargs):
+                changed = self.generation_model(**kwargs)
+                self.verifier.verify(changed, closed=kwargs.get('closed', False), inventory_generation=GENERATION)
+                self.reject(changed, closed=kwargs.get('closed', False))
+        with self.assertRaises(AssertionError):
+            self.verifier.verify(model(), inventory_generation=GENERATION)
+
+    def test_generation_rejects_invalid_identity_physical_alias_and_mount_escapes(self):
+        for generation in ('', 'bad', GENERATION.upper(), GENERATION.replace('-', ''),
+                           '{' + GENERATION + '}', '00000000-0000-0000-0000-000000000000', 1, True):
+            with self.subTest(invalid=generation), self.assertRaises(AssertionError):
+                self.verifier.verify(self.generation_model(), inventory_generation=generation)
+        changes = [
+            ('missing project', lambda m: m.pop('name')),
+            ('wrong project', lambda m: m.update(name='other-project')),
+            ('wrong UUID', lambda m: m['volumes']['agent-live-inventory'].update(name=PROJECT + '_agent-live-inventory-11111111-1111-4111-8111-111111111111')),
+            ('old name', lambda m: m['volumes']['agent-live-inventory'].update(name=PROJECT + '_agent-live-inventory')),
+            ('arbitrary alias', lambda m: m['volumes']['agent-live-inventory'].update(name='synthetic-sensitive-sentinel')),
+            ('implicit name', lambda m: m['volumes']['agent-live-inventory'].pop('name')),
+            ('external', lambda m: m['volumes']['agent-live-inventory'].update(external=True)),
+            ('driver opts', lambda m: m['volumes']['agent-live-inventory'].update(driver_opts={'device': 'synthetic-sensitive-sentinel'})),
+            ('remote driver', lambda m: m['volumes']['agent-live-inventory'].update(driver='synthetic-remote-driver')),
+            ('subpath', lambda m: m['services']['archguard-platform']['volumes'][6].update(volume={'subpath': 'entry'})),
+            ('writable', lambda m: m['services']['archguard-platform']['volumes'][6].update(read_only=False)),
+            ('wrong path', lambda m: m['services']['archguard-platform']['volumes'][6].update(target='/other')),
+            ('master hijack', lambda m: m['volumes']['credential-master'].update(name=PROJECT + '_agent-live-inventory-' + GENERATION)),
+            ('cipher hijack', lambda m: m['volumes']['credential-ciphertext'].update(name=PROJECT + '_agent-live-inventory-' + GENERATION)),
+            ('UUID env', lambda m: m['services']['archguard-platform']['environment'].update(ARCHGUARD_AGENT_INVENTORY_GENERATION=GENERATION)),
+        ]
+        for name, mutate in changes:
+            changed = self.generation_model()
+            mutate(changed)
+            with self.subTest(boundary=name), self.assertRaises(AssertionError):
+                self.verifier.verify(changed, inventory_generation=GENERATION)
+        for service in model()['services']:
+            if service == 'archguard-platform':
+                continue
+            for alias in ('inventory-alias', 'postgres-data', 'credential-master'):
+                changed = self.generation_model()
+                changed['volumes'][alias] = {'name': PROJECT + '_agent-live-inventory-' + GENERATION}
+                changed['services'][service].setdefault('volumes', []).append(
+                    {'type': 'volume', 'source': alias, 'target': '/alias', 'read_only': True})
+                with self.subTest(service=service, alias=alias), self.assertRaises(AssertionError):
+                    self.verifier.verify(changed, inventory_generation=GENERATION)
+
+    def test_cli_generation_stdin_file_closed_and_sanitized_argument_failures(self):
+        def run(args, value=None):
+            return subprocess.run([sys.executable, str(VERIFIER), *args],
+                                  input=json.dumps(value) if value is not None else '',
+                                  capture_output=True, text=True, timeout=10)
+        for args, value in ((['-'], model()), (['-', '--closed'], model(closed=True)),
+                            (['-', '--inventory-generation', GENERATION], self.generation_model()),
+                            (['--closed', '--inventory-generation', GENERATION, '-'], self.generation_model(closed=True))):
+            result = run(args, value)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), 'Live Compose configuration boundaries: PASS')
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'synthetic-sensitive-sentinel.json'
+            path.write_text(json.dumps(self.generation_model(closed=True)), encoding='utf-8')
+            result = run([str(path), '--inventory-generation', GENERATION, '--closed'])
+            self.assertEqual(result.returncode, 0, result.stderr)
+        for args in ([], ['-', '--unknown', 'synthetic-sensitive-sentinel'],
+                     ['-', '--closed', '--closed'], ['-', '--inventory-generation'],
+                     ['-', '--inventory-generation', GENERATION, '--inventory-generation', GENERATION],
+                     ['-', '--inventory-generation', '--closed'], ['-', 'synthetic-sensitive-sentinel'],
+                     ['synthetic-sensitive-sentinel', '--closed', 'extra']):
+            result = run(args, self.generation_model())
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stderr.strip(), 'arguments boundary')
+            self.assertEqual(result.stdout, '')
+        for args, raw in ((['-', '--inventory-generation', 'synthetic-sensitive-sentinel'], self.generation_model()),
+                          (['synthetic-sensitive-sentinel'], None), (['-'], None)):
+            result = run(args, raw)
+            self.assertEqual(result.returncode, 1)
+            self.assertNotIn('synthetic-sensitive-sentinel', result.stdout + result.stderr)
+            self.assertIn(result.stderr.strip(), ('identity boundary', 'input boundary', 'model boundary'))
+        for body in ('synthetic-sensitive-sentinel', '[' * 5000 + 'synthetic-sensitive-sentinel'):
+            result = subprocess.run([sys.executable, str(VERIFIER), '-'], input=body,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stderr.strip(), 'input boundary')
+            self.assertEqual(result.stdout, '')
 
     def test_rejects_namespace_network_and_port_escape(self):
         self.mutations([

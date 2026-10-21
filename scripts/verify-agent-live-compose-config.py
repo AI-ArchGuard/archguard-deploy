@@ -81,7 +81,7 @@ def safe_environment(env):
                 'environment boundary')
 
 
-def _verify(model, *, closed):
+def _verify(model, *, closed, inventory_generation):
     services = model['services']
     require(set(services) == {'runtime-init', 'postgres', 'keycloak', 'archguard-platform',
             'scanner-runner', 'archguard-web', 'credential-init', 'credential-check',
@@ -98,6 +98,12 @@ def _verify(model, *, closed):
         return model['name'] + '_' + source
 
     inventory_identity = physical_volume_name('agent-live-inventory')
+    if inventory_generation is not None:
+        identity(inventory_generation)
+        require(isinstance(model.get('name'), str) and
+                re.fullmatch('[a-z0-9][a-z0-9_-]*', model['name']), 'volume identity boundary')
+        require(inventory_identity == model['name'] + '_agent-live-inventory-' + inventory_generation,
+                'volume identity boundary')
     inventory_sources = {source for source in model['volumes']
                          if physical_volume_name(source) == inventory_identity}
     require(set(model['networks']) == {'frontend', 'backend', 'agent-egress'}, 'network boundary')
@@ -191,11 +197,17 @@ def _verify(model, *, closed):
     for name in ('credential-master', 'credential-ciphertext', 'agent-live-inventory'):
         definition = model['volumes'][name] or {}
         require(not definition.get('external') and not definition.get('driver_opts'), 'volume identity boundary')
+        if name == 'agent-live-inventory':
+            require(definition.get('driver', 'local') == 'local', 'volume identity boundary')
+            require('subpath' not in mounts[INVENTORY].get('volume', {}), 'volume identity boundary')
+            if inventory_generation is not None:
+                continue
         if definition.get('name'):
             require(model.get('name') and definition['name'] == model['name'] + '_' + name, 'volume identity boundary')
 
     env = platform['environment']
     safe_environment(env)
+    require('ARCHGUARD_AGENT_INVENTORY_GENERATION' not in env, 'environment boundary')
     require(env['SPRING_PROFILES_ACTIVE'] == 'oidc,local-compose,agent-live', 'profile boundary')
     require(env.get('JAVA_TOOL_OPTIONS') == '-Djdk.httpclient.disableRetryConnect=true', 'JVM boundary')
     require(env.get('ARCHGUARD_AGENT_SYNTHETIC_ENABLED') == 'false', 'synthetic boundary')
@@ -230,20 +242,44 @@ def _verify(model, *, closed):
         require(path_equal(proxy['source'], ROOT / 'rollback/web.nginx.conf'), 'closure proxy boundary')
 
 
-def verify(model: dict, *, closed: bool = False) -> None:
+def verify(model: dict, *, closed: bool = False, inventory_generation: str | None = None) -> None:
     try:
         require(isinstance(model, dict) and type(closed) is bool, 'model boundary')
-        _verify(model, closed=closed)
+        _verify(model, closed=closed, inventory_generation=inventory_generation)
     except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
         raise AssertionError('model boundary') from None
 
 
+def arguments(argv):
+    """Parse only the documented options; never echo private tokens or paths."""
+    source = None
+    closed = False
+    generation = None
+    offset = 0
+    while offset < len(argv):
+        value = argv[offset]
+        if value == '--closed':
+            require(not closed, 'arguments boundary')
+            closed = True
+        elif value == '--inventory-generation':
+            require(generation is None and offset + 1 < len(argv), 'arguments boundary')
+            offset += 1
+            generation = argv[offset]
+            require(bool(generation) and not generation.startswith('-'), 'arguments boundary')
+        else:
+            require(source is None and (value == '-' or not value.startswith('-')), 'arguments boundary')
+            source = value
+        offset += 1
+    require(source is not None, 'arguments boundary')
+    return source, closed, generation
+
+
 def main():
     try:
-        require(len(sys.argv) in (2, 3) and (len(sys.argv) == 2 or sys.argv[2] == '--closed'), 'arguments boundary')
-        source = sys.stdin.read() if sys.argv[1] == '-' else Path(sys.argv[1]).read_text(encoding='utf-8-sig')
-        verify(json.loads(source), closed=len(sys.argv) == 3)
-    except (AssertionError, OSError, ValueError) as rejected:
+        path, closed, generation = arguments(sys.argv[1:])
+        source = sys.stdin.read() if path == '-' else Path(path).read_text(encoding='utf-8-sig')
+        verify(json.loads(source), closed=closed, inventory_generation=generation)
+    except (AssertionError, OSError, ValueError, RecursionError) as rejected:
         # OSError/JSON errors may contain private paths or content; never echo.
         category = str(rejected) if isinstance(rejected, AssertionError) else 'input boundary'
         print(category, file=sys.stderr)

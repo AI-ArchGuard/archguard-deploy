@@ -146,6 +146,29 @@ jobs:
           python3 scripts/verify-agent-live-compose-config.py .local/live-default.json
           jq -e '.services["archguard-platform"].environment | .ARCHGUARD_AGENT_ENABLED == "false" and .ARCHGUARD_AGENT_LIVE_ENABLED == "false" and .ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED == "false" and .ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED == "false"' .local/live-default.json
           jq -e '.services["archguard-web"].build.args | .VITE_AGENT_UI_ENABLED == "false" and .VITE_AGENT_LIVE_UI_ENABLED == "false" and .VITE_CREDENTIAL_UI_ENABLED == "false"' .local/live-default.json
+          # Explicit selection changes only the native inventory physical name.
+          # -p wins over a conflicting inherited COMPOSE_PROJECT_NAME.
+          export ARCHGUARD_AGENT_INVENTORY_GENERATION=abcdef12-2222-4222-8222-222222222222
+          COMPOSE_PROJECT_NAME=ignored-environment-project "$ARCHGUARD_COMPOSE" "${live[@]}" -f compose.agent-inventory-generation.yaml config --format json > .local/live-generation-default.json
+          python3 scripts/verify-agent-live-compose-config.py .local/live-generation-default.json --inventory-generation "$ARCHGUARD_AGENT_INVENTORY_GENERATION"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          old = json.loads(Path('.local/live-default.json').read_text())
+          new = json.loads(Path('.local/live-generation-default.json').read_text())
+          assert new['name'] == 'archguard-agent-4h'
+          assert new['volumes']['agent-live-inventory']['name'] == 'archguard-agent-4h_agent-live-inventory-abcdef12-2222-4222-8222-222222222222'
+          new['volumes']['agent-live-inventory']['name'] = old['volumes']['agent-live-inventory']['name']
+          assert new == old
+          PY
+          if python3 scripts/verify-agent-live-compose-config.py .local/live-generation-default.json; then
+            echo 'Generation without explicit verifier opt-in unexpectedly accepted' >&2
+            exit 1
+          fi
+          if env -u ARCHGUARD_AGENT_INVENTORY_GENERATION "$ARCHGUARD_COMPOSE" "${live[@]}" -f compose.agent-inventory-generation.yaml config --format json > /dev/null 2> "$RUNNER_TEMP/inventory-generation-missing.log"; then
+            echo 'Missing generation unexpectedly rendered' >&2
+            exit 1
+          fi
           export ARCHGUARD_AGENT_ENABLED=true ARCHGUARD_AGENT_LIVE_ENABLED=true
           export ARCHGUARD_AGENT_SYNTHETIC_INVENTORY_ENABLED=true ARCHGUARD_CREDENTIAL_MANAGEMENT_ENABLED=true
           export ARCHGUARD_AGENT_UI_ENABLED=true ARCHGUARD_AGENT_LIVE_UI_ENABLED=true ARCHGUARD_CREDENTIAL_UI_ENABLED=true
@@ -157,6 +180,10 @@ jobs:
           python3 scripts/verify-agent-live-compose-config.py .local/live-bound.json
           "$ARCHGUARD_COMPOSE" "${live[@]}" -f compose.agent-live-closed.yaml config --format json > .local/live-closed.json
           python3 scripts/verify-agent-live-compose-config.py .local/live-closed.json --closed
+          "$ARCHGUARD_COMPOSE" "${live[@]}" -f compose.agent-inventory-generation.yaml config --format json > .local/live-generation-bound.json
+          python3 scripts/verify-agent-live-compose-config.py .local/live-generation-bound.json --inventory-generation "$ARCHGUARD_AGENT_INVENTORY_GENERATION"
+          "$ARCHGUARD_COMPOSE" "${live[@]}" -f compose.agent-inventory-generation.yaml -f compose.agent-live-closed.yaml config --format json > .local/live-generation-closed.json
+          python3 scripts/verify-agent-live-compose-config.py .local/live-generation-closed.json --closed --inventory-generation "$ARCHGUARD_AGENT_INVENTORY_GENERATION"
       - name: Build scoped fixture images before offline tests
         shell: bash
         run: |
@@ -183,7 +210,7 @@ jobs:
           set -euo pipefail
           python3 scripts/test-agent-network.py --image "$GUARD_IMAGE" --platform-image "$CURL_IMAGE"
           python3 scripts/live-compose-fixtures/test_rollback_proxy_http.py --image "$NGINX_IMAGE" --client-image "$GUARD_IMAGE"
-      - name: Prove native new-volume inventory initialization and refusal to overwrite
+      - name: Prove two native generations, old expiry and immutable archive
         run: python3 scripts/test-agent-inventory-volume.py --image "$GUARD_IMAGE"
 
   windows-startup:

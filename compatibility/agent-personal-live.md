@@ -28,6 +28,10 @@ CI 先构建/拉取再取得本地不可变 ID，才运行 fake TCP/HTTP fixture
 
 ## 兼容顺序和回滚边界
 
+[显式选代设计](../docs/agent-inventory-generation-design.md)只新增 Deploy 可选覆盖层、校验和测试；不提升上面的候选 SHA，不改变 Platform API、Schema、迁移、Scanner 或回滚21表快照 Schema。默认仍为原 `<project>_agent-live-inventory`；显式加 `-f compose.agent-inventory-generation.yaml` 后必须提供规范非零 `ARCHGUARD_AGENT_INVENTORY_GENERATION`，精确物理名 `<actual Compose project>_agent-live-inventory-<UUID>`，并执行 `verify-agent-live-compose-config.py ... --inventory-generation UUID`；关闭模型同时加 `--closed`。UUID 只参与卷名，不进入 Platform 环境/API。Compose5.5.1 和严格 verifier 必须共同验证，不能用任意别名、external 或非本地 driver。
+
+本增量兼容顺序：已有 Docs 边界 → Platform tests-only → Deploy 配置/校验/CI → 另获实际关闭部署批准 → 另获新 owner ack/batch/具体次数及费用批准。实际选代先核对内核全部出口条目关闭、Platform停止及独立 DB pending=0，再固定21表/audit、native DB/master/ciphertext/旧来源卷身份与字节/权限基线；精确新卷必须原先不存在，已存在即便为空也拒绝。只对新空卷初始化一次，失败不修复/重试。只启动选定关闭模型的 Platform，使用 `--no-deps --pull never` 并保留 DB/OIDC/Runner/guard；实际 mount/只读、新 UUID/摘要、旧卷字节/模式和全部21表/audit不变须受保护地逐项证明。禁止热替换、全栈 up/bootstrap、down --volumes 或 prune。静态校验不证明 kernel/mount/process/pending/DB；回退应用或回挂旧过期卷均不恢复许可。旧 UNKNOWN/预留/停止/撤销和密文历史不可变，最多24小时不延长；不创建最终验收报告或关闭阶段。
+
 已完成来源顺序：Docs ADR-0015/main CI → 固定 Samples/Scanner → Platform 生产者 `0.4.0` 合入/main CI → Web 当前显式确认消费契约合入/main CI。后续顺序：Deploy 审查、全部 CI、正常 SHA-guarded 合并/main CI → 操作员填入真实 Deploy 合并 SHA、核对实际制品并重新绑定 owner/deployment/Project/manifest/来源/batch/templates/current credentialVersion/检查 refs/`0.4.0`/1017/价格与预留策略/有效期及原两次限额 → 本机运行。原始代码版本仍 `0.4.0/0.2.0`；顺序和版本号不能替代实际 SHA/字节。当前 verifier 只接受本矩阵精确新组合并拒绝旧工程组合；不得通过放松校验或多候选接受跳过契约变更。所有新 live/UI/管理/来源开关默认 false，官方集合默认空，独立 inventory 原生卷不自动初始化。旧成本 acknowledgement 不升级为新批准。
 
 实际回滚先完成 Project/batch/worker 关闭、所有入口关闭、guard 清空官方集合，再停 Platform 并 capture。保持同一 `archguard-agent-4h`/8081、原 DB/OIDC/凭据卷与 deployment UUID；不轮换密码、不清空卷、不重建 Keycloak、不改 V1–V16、不 repair/down migration。固定旧应用制品的实际哈希后运行旧治理/Runner 旅程，比较全部 21 表；恢复当前应用时另核对 Flyway validate、JAR资源SHA和引用可读性，调用仍关闭。替换 namespace 必须先停 Platform、等 guard readiness 后启动 Java。

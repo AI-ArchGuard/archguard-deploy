@@ -26,7 +26,7 @@ python scripts/live-compose-fixtures/test_rollback_proxy_http.py --image $nginxF
 python scripts/test-agent-inventory-volume.py --image $guardImage
 ```
 
-第三条只创建唯一临时空卷：UID0/no capabilities/network none 初始化，UID10001/只读卷验证，拒绝覆盖后再次验证并内部比较字节；仅输出 PASS/布尔。按返回的精确 container ID、卷名及独有标签核验后清理，没有 prune、通配删除或活动卷名。具体执行结果以 root 的当前日志/PR CI 为准；文档不预先宣称这些新 CI 和 volume fixture 已通过。
+第三条只创建两个唯一标记、测试独占的临时 native local 空卷：固定测试时钟初始化旧代，独立重新审查同一 manifest/fixture/deployment/Project的新 UUID并初始化新代；UID10001/只读验证旧代过期、新代当前有效。拒绝覆盖后旧代仍过期，内部比较两卷原字节与0555/0444模式；归档未变不代表当前有效。仅输出 PASS/布尔，不输出正文/ID/摘要。按返回的精确 container ID、卷名及独有标签核验后清理，没有 prune、通配删除或活动卷名。部分失败后的重试拒绝另由POSIX文件系统回归覆盖。具体执行结果以 root 的当前日志/PR CI 为准。
 
 ## 实际操作前必须满足的条件
 
@@ -37,7 +37,34 @@ python scripts/test-agent-inventory-volume.py --image $guardImage
 5. 官方协议、价格和模型映射必须在实际两次请求前重新核对。2026-10-18 的人工更新只涉及 `DeepSeek-V4.1-Flash-1017` 官方映射；其他条件及总计两次上限不变，不能推导更多调用。当前候选使用 Settings/ack `0.4.0` 与精确 1017 配对；Batch `0.3.0`、live API/输出和 Scanner Schema `0.1.0` 不变。旧确认可读、撤销、独立结算，但不得静默升级为当前批准或产生新真实发送。固定请求名及单元素响应白名单均仅为 `deepseek-flash`，公告快照名不能加入白名单；与获批映射不一致即停止，不擅改 endpoint/model 或价格策略。固定 `/responses`、非流式、无工具/会话/重试、`reasoning.effort=none`、`tool_choice=none`、`store=false` 及上下文价格版本 `deepseek-flash-context-peak-usd-2026-10-15` 不变。
 6. 每次完整请求至多 6000 UTF-8 字节、输出至多 1500 Token；输入 8000 是调用后的观察阈值，不是增加请求大小的许可。每次预留 316373 microUSD，单次/批次上限 350000/700000，Project/部署日上限 5000000/20000000。费用、真实 usage 或引用异常立即停止，无探测、自动重试或失败替代。
 
-## 新的受控 inventory 原生卷
+## 来源证明的显式选代（仅操作设计，另获实际批准）
+
+[获批设计](agent-inventory-generation-design.md)保留旧卷作为不可变归档，重新审查同一合成数据、manifest和fixture的当前条目，使用新inventoryId/reviewRef/reviewedAt/expiresAt和全新原生本地卷。有效期仍最多24小时，禁止延长旧证明或把旧过期条目追加进新active文件；全文件全部条目仍须有效。此次只实施离线配置和CI，不创建或切换实际部署卷、不部署、不调用模型、不产生费用。
+
+默认三层live配置保持原 `<project>_agent-live-inventory`。可选覆盖层**只**改变逻辑 `agent-live-inventory` 的物理name：`<实际 Compose project>_agent-live-inventory-<UUID>`。`ARCHGUARD_AGENT_INVENTORY_GENERATION` 必须规范小写、非零UUID且等于新文件唯一条目的inventoryId；不允许任意卷名、external、driver_opts、远程driver或subpath。UUID不进入Platform环境/API。以下仅渲染/静态核验，在独立受控终端中使用已核验Compose5.5.1：
+
+```powershell
+# $live 为下文原 project/env/三层参数；UUID由本次人工来源审查提供，不能随机补参。
+$env:ARCHGUARD_AGENT_INVENTORY_GENERATION = $newInventoryId
+$generation = @($live) + @('-f','compose.agent-inventory-generation.yaml')
+docker compose @generation --profile credential-bootstrap config --format json |
+  python scripts/verify-agent-live-compose-config.py - --inventory-generation $newInventoryId
+docker compose @generation -f compose.agent-live-closed.yaml --profile credential-bootstrap config --format json |
+  python scripts/verify-agent-live-compose-config.py - --closed --inventory-generation $newInventoryId
+```
+
+未加覆盖层及未传verifier参数只接受原名；新名没有显式参数、旧名冒充新代、错project/UUID、非规范/零UUID、别名挂载均拒绝。覆盖层缺参渲染失败，不自动选最新代或生成UUID。静态verifier只检查模型，不证明实际kernel、mount、process、pending或DB。
+
+实际选代必须另获卷操作/关闭部署批准，按此顺序人工执行并保存受保护证据：
+
+1. 核对固定候选制品和全部PR/main CI，关闭Web/Project/部署/live等全部入口；逐项复核完整内核出口规则及所有条目关闭。停止Platform，确认无Java/发送进程，再以独立只读DB检查证明pending=0；仅停止进程不能代替DB检查。pending非零立即停止，不取消/重试/释放预留。
+2. 固定全部21表/audit、native DB/master/ciphertext/旧inventory物理身份，以及旧卷字节和权限基线。核对本次精确新物理卷**不存在**；已存在即便为空也停止，不能把幂等create返回视为首次创建证据。
+3. 只创建并初始化这个新empty native local卷一次；初始化器及其固定路径/权限语义不变，不挂旧卷、DB或凭据。失败保留残留，不repair/chmod/清理重试，也不自动换UUID继续。
+4. Platform停止且出口关闭时选择新代。比较渲染和实际mount的精确新物理身份、只读目标 `/run/archguard-inventory`、新文件UUID/摘要/权限，证明旧卷字节/模式、DB/master/ciphertext身份与全部21表/audit完全不变。UUID/摘要和检查索引只存受保护操作员证据，configProofRef只是索引，不替代动态证明，也不修改回滚Schema。
+5. 仅以 `docker compose @generation -f compose.agent-live-closed.yaml up -d --no-deps --pull never archguard-platform` 启动开关全部关闭的Platform；另核对实际关闭制品。保留DB/OIDC/Runner/guard及namespace，不全栈up、bootstrap、热换文件/挂载、down --volumes、prune或删除旧卷。若需修改Web/guard，另列关闭部署计划。
+6. 新来源证明不等于调用批准；后续另需新owner acknowledgement、新batch及具体次数/费用批准。旧UNKNOWN/预留/停止/撤销/请求槽位和密文历史不改、不退款、不补发。应用回退仍先关闭入口/出口；回挂旧过期卷不能恢复许可。本增量不创建最终运行报告或关闭阶段。
+
+## 首次 legacy 原生卷初始化（尚无旧卷时）
 
 inventory 是来源审查记录，不是调用许可。Platform 保持现有严格校验，缺失/失效只使 Agent 不可用；不会阻止核心启动。Windows host bind 在 Linux 显示 0777，不能冒充 Platform 所需的原生权限证明。
 
