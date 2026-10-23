@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Bounded envelope diagnostics candidate binding
+
+- Bind only Platform to actual PR #68/main `35e721b`, tree `2da62c0`, main CI `39981988430` (Linux942 tests, no failures/errors/skips, successful image build). Preserve all other source identities, contracts, V1–V16 and protocol/model/price limits.
+- Exercise both actual manifest/snapshot validators with independent literals: accept the exact merge, reject superseded `8b547fa`, PR head `2ed5122`, equal-tree local `1ba4e44` and all prior negative cases. Keep the singleton tuple and every 21-table/history/ACL assertion.
+- The bounded diagnostic reasons/count do not widen response acceptance, retain provider content or identify the discarded real response's cause. Stopped/UNKNOWN/reserved history and old proofs remain intact. This source synchronization does not grant new calls/fees, volume changes, runtime acceptance, release or stage closure; independently approved closed deployment follows successful Deploy PR/main CI and separate runtime evidence.
+
 ## Unreleased — Bounded response metadata candidate binding
 
 - Bind only the exact Platform source to merged main `8b547fa` (main CI `39565721127`): owner-approved PR #66 inert root-metadata compatibility plus PR #67 tests-only inventory/history regression. Keep the other source pins, public contracts, protocol, model mapping, prices and V1–V16 migrations.

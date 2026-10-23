@@ -96,7 +96,7 @@ def manifest():
             "deploymentId": "44444444-4444-4444-8444-444444444444",
             "candidates": {
                 "docs": "077a7c5afa12557543ee04e14321701c3537931a",
-                "platform": "8b547faacd7a7b09992006f677467fffc7b08919",
+                "platform": "35e721bb5e612e505ae7a9a3e4b391ea64f1352e",
                 "web": "5c5a7a021210876cda55850d7898e11aa52781aa",
                 "scanner": "d4b8e98bfdabbc78f65910ed37e3062167d04b07",
                 "samples": "a53a5bbea2630aac2135aa217d961cdbb77851a3",
@@ -261,9 +261,9 @@ class FinalHistoryContractTest(unittest.TestCase):
         # Canonical merge SHAs are independent literals, never production CANDIDATES.
         rollback.validate_manifest(manifest())
 
-    def test_manifest_and_snapshot_accept_exact_response_metadata_platform_candidate(self):
+    def test_manifest_and_snapshot_accept_exact_envelope_diagnostics_platform_candidate(self):
         candidate = manifest()
-        candidate["candidates"]["platform"] = "8b547faacd7a7b09992006f677467fffc7b08919"
+        candidate["candidates"]["platform"] = "35e721bb5e612e505ae7a9a3e4b391ea64f1352e"
         snapshot = {"schemaVersion": "0.1.0", "kind": "PERSONAL_LIVE_FINAL_ROLLBACK",
                     "manifest": copy.deepcopy(candidate), "database": self.parse()}
         for operation in ("manifest", "snapshot"):
@@ -274,7 +274,10 @@ class FinalHistoryContractTest(unittest.TestCase):
                     rollback.validate_snapshot(snapshot, candidate)
 
     def test_manifest_and_snapshot_reject_superseded_and_equal_tree_platforms(self):
-        for platform in ("af821fc99553d462a2176cba5af70be7cc960c75",
+        for platform in ("8b547faacd7a7b09992006f677467fffc7b08919",
+                         "2ed51225de6c6ac02d217fc73982214cbaff34f5",
+                         "1ba4e4479481b4b2011ab9faed9f3a82ae190d7c",
+                         "af821fc99553d462a2176cba5af70be7cc960c75",
                          "c461f6be3cac6f226750d64cdb877f412a5b9bb4",
                          "dfb1f9541323b80ee46eb527e333e5f27b279be9"):
             candidate = manifest()
